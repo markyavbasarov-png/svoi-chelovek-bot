@@ -36,15 +36,13 @@ def back():
     return ReplyKeyboardMarkup([[KeyboardButton("⬅️ Назад")]], resize_keyboard=True)
 
 def menu():
-    return ReplyKeyboardMarkup(
-        [
-            [
+    return ReplyKeyboardMarkup(   
+[
     ["📝 Рассказать о себе"],
     ["👀 Найти своего человека"],
     ["✍️ Редактировать анкету"],
     ["🗑 Удалить анкету"]
-]
-        ],
+],
         resize_keyboard=True
     )
 # ================== TEXTS ==================
