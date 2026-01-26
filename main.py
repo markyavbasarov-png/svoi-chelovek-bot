@@ -1,9 +1,5 @@
 import os
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -14,10 +10,10 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# временное хранилище анкет
+# Хранилище анкет (временно, в памяти)
 users = {}
 
-# ---------- КНОПКИ МЕНЮ ----------
+# ---------- МЕНЮ ----------
 def main_menu():
     return ReplyKeyboardMarkup(
         [
@@ -33,23 +29,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет!\n\n"
         "Я бот знакомств для родителей-одиночек ❤️\n\n"
-        "Здесь ты можешь:\n"
-        "• создать анкету\n"
-        "• добавить фото\n"
-        "• спокойно общаться\n\n"
+        "Здесь можно спокойно познакомиться — без спешки и давления.\n\n"
         "Выбери действие 👇",
         reply_markup=main_menu()
     )
 
-# ---------- ОБРАБОТКА КНОПОК ----------
+# ---------- КНОПКИ ----------
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.message.from_user.id
 
+    # Создание анкеты
     if text == "📝 Создать анкету":
         users[user_id] = {"step": "name"}
         await update.message.reply_text("Как тебя зовут?")
 
+    # О боте
     elif text == "ℹ️ О боте":
         await update.message.reply_text(
             "❤️ «Свой человек» — место для тёплых знакомств\n"
@@ -57,6 +52,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Без спешки. Без давления."
         )
 
+    # Смотреть анкеты
     elif text == "👀 Смотреть анкеты":
         shown = False
 
@@ -78,6 +74,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Загляни чуть позже"
             )
 
+    # Продолжение заполнения анкеты
     else:
         await handle_form(update, context)
 
