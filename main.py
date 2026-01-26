@@ -72,7 +72,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=menu(),
         parse_mode="HTML"
     )
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
+async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📝 Рассказать о себе":
+        await update.message.reply_text(
+            "📝 Моя анкета\n\n"
+            "Расскажи о себе🙂"
+        )
+
+    elif text == "👀 Найти своего человека":
+        await update.message.reply_text(
+            "💞 Ищу твоего человека...\n"
+            "Подбираю анкеты для тебя"
+        )
+
+    elif text == "✍️ Редактировать анкету":
+        await update.message.reply_text(
+            "✍️ Что хочешь изменить?\n"
+            "Скоро добавим выбор 😉"
+        )
+
+    elif text == "🗑 Удалить анкету":
+        await update.message.reply_text(
+            "🗑 Анкета удалена"
+        )
 # ================== АНКЕТА ==================
 async def start_form(update, context):
     context.user_data.clear()
