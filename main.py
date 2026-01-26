@@ -1,167 +1,186 @@
+import logging
 import os
+import sqlite3
+
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
-    KeyboardButton
+    ReplyKeyboardRemove,
+    InputMediaPhoto,
 )
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     MessageHandler,
+    ConversationHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
-TOKEN = os.getenv("BOT_TOKEN")
+logging.basicConfig(level=logging.INFO)
 
-users = {}
-VIEW_LIMIT = 50
+# ====== СОСТОЯНИЯ ======
+TARGET, PHOTO, BIO, VIEW = range(4)
 
-# ---------- КНОПКИ ----------
+# ====== БАЗА ======
+conn = sqlite3.connect("profiles.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS profiles (
+    user_id INTEGER PRIMARY KEY,
+    target TEXT,
+    photo TEXT,
+    bio TEXT
+)
+""")
+conn.commit()
+
+
+# ====== КЛАВИАТУРЫ ======
+def back_keyboard():
+    return ReplyKeyboardMarkup([["⬅️ Назад"]], resize_keyboard=True)
+
+def target_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            ["👩 Подругу", "🤝 Друга"],
+            ["👨 Парня", "👩‍❤️‍👨 Девушку"],
+            ["⬅️ Назад"],
+        ],
+        resize_keyboard=True,
+    )
+
 def main_menu():
     return ReplyKeyboardMarkup(
-        [
-            ["📝 Создать анкету"],
-            ["👀 Смотреть анкеты"],
-            ["ℹ️ О боте"]
-        ],
-        resize_keyboard=True
+        [["👀 Смотреть анкеты"]], resize_keyboard=True
     )
 
-def back_menu():
-    return ReplyKeyboardMarkup(
-        [["⬅️ Назад"]],
-        resize_keyboard=True
-    )
 
-def search_menu():
-    return ReplyKeyboardMarkup(
-        [
-            ["👨 Парня", "👩 Девушку"],
-            ["🤝 Друга", "👯 Подругу"],
-            ["⬅️ Назад"]
-        ],
-        resize_keyboard=True
-    )
-
-# ---------- /start ----------
+# ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Добро пожаловать в «Свой человек» ❤️\n\n"
-        "Здесь — тёплые знакомства без спешки.\n\n"
-        "Выбери действие 👇",
-        reply_markup=main_menu()
+        "Привет 💫\nВ кого ты ищешь?",
+        reply_markup=target_keyboard(),
+    )
+    return TARGET
+
+
+# ====== ЦЕЛЬ ======
+async def get_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "⬅️ Назад":
+        return await start(update, context)
+
+    context.user_data["target"] = update.message.text
+
+    await update.message.reply_text(
+        "📸 Отправь своё фото",
+        reply_markup=back_keyboard(),
+    )
+    return PHOTO
+
+
+# ====== ФОТО ======
+async def get_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "⬅️ Назад":
+        await update.message.reply_text(
+            "В кого ты ищешь?",
+            reply_markup=target_keyboard(),
+        )
+        return TARGET
+
+    photo_id = update.message.photo[-1].file_id
+    context.user_data["photo"] = photo_id
+
+    await update.message.reply_text(
+        "✍️ Расскажи о себе",
+        reply_markup=back_keyboard(),
+    )
+    return BIO
+
+
+# ====== О СЕБЕ ======
+async def get_bio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "⬅️ Назад":
+        await update.message.reply_text(
+            "📸 Отправь своё фото",
+            reply_markup=back_keyboard(),
+        )
+        return PHOTO
+
+    bio = update.message.text
+    if len(bio) < 10:
+        await update.message.reply_text("Напиши чуть подробнее 🙂")
+        return BIO
+
+    user_id = update.message.from_user.id
+
+    cursor.execute(
+        "REPLACE INTO profiles (user_id, target, photo, bio) VALUES (?, ?, ?, ?)",
+        (
+            user_id,
+            context.user_data["target"],
+            context.user_data["photo"],
+            bio,
+        ),
+    )
+    conn.commit()
+
+    await update.message.reply_text(
+        "✅ Анкета сохранена!",
+        reply_markup=main_menu(),
+    )
+    return VIEW
+
+
+# ====== ПРОСМОТР АНКЕТ ======
+async def view_profiles(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+
+    cursor.execute(
+        "SELECT photo, bio FROM profiles WHERE user_id != ? LIMIT 50",
+        (user_id,),
+    )
+    profiles = cursor.fetchall()
+
+    if not profiles:
+        await update.message.reply_text("Анкет пока нет 😔")
+        return VIEW
+
+    for photo, bio in profiles:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=bio,
+        )
+
+    return VIEW
+
+
+def main():
+    TOKEN = os.getenv("BOT_TOKEN")
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN не задан")
+
+    app = Application.builder().token(TOKEN).build()
+
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            TARGET: [MessageHandler(filters.TEXT, get_target)],
+            PHOTO: [
+                MessageHandler(filters.PHOTO, get_photo),
+                MessageHandler(filters.TEXT, get_photo),
+            ],
+            BIO: [MessageHandler(filters.TEXT, get_bio)],
+            VIEW: [MessageHandler(filters.TEXT, view_profiles)],
+        },
+        fallbacks=[CommandHandler("start", start)],
     )
 
-# ---------- ТЕКСТ ----------
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    user_id = update.message.from_user.id
+    app.add_handler(conv)
 
-    if text == "⬅️ Назад":
-        users.pop(user_id, None)
-        await update.message.reply_text("Ты в главном меню 👇", reply_markup=main_menu())
-        return
+    app.run_polling(drop_pending_updates=True)
 
-    if text == "📝 Создать анкету":
-        users[user_id] = {"step": "name"}
-        await update.message.reply_text("Как тебя зовут?", reply_markup=back_menu())
-        return
-
-    if text == "ℹ️ О боте":
-        await update.message.reply_text(
-            "❤️ «Свой человек» — знакомства для родителей-одиночек.\n\n"
-            "Без давления. Без спешки."
-        )
-        return
-
-    if text == "👀 Смотреть анкеты":
-        shown = 0
-        for uid, profile in users.items():
-            if uid != user_id and profile.get("step") == "done":
-                await update.message.reply_photo(
-                    photo=profile["photo"],
-                    caption=(
-                        f"👤 {profile['name']}\n"
-                        f"🎂 {profile['age']} лет\n"
-                        f"📍 {profile['city']}\n"
-                        f"🔎 Ищет: {profile['search']}"
-                    )
-                )
-                shown += 1
-                if shown >= VIEW_LIMIT:
-                    break
-
-        if shown == 0:
-            await update.message.reply_text("Пока нет анкет 😔")
-        return
-
-    # ---------- АНКЕТА ----------
-    if user_id not in users:
-        return
-
-    step = users[user_id].get("step")
-
-    if step == "name":
-        users[user_id]["name"] = text
-        users[user_id]["step"] = "age"
-        await update.message.reply_text("Сколько тебе лет?", reply_markup=back_menu())
-
-    elif step == "age":
-        if not text.isdigit():
-            await update.message.reply_text("Введи возраст цифрами")
-            return
-        users[user_id]["age"] = text
-        users[user_id]["step"] = "city"
-        await update.message.reply_text("Из какого ты города?", reply_markup=back_menu())
-
-    elif step == "city":
-        users[user_id]["city"] = text
-        users[user_id]["step"] = "search"
-        await update.message.reply_text(
-            "Кого ты ищешь?",
-            reply_markup=search_menu()
-        )
-
-    elif step == "search":
-        users[user_id]["search"] = text
-        users[user_id]["step"] = "photo"
-        await update.message.reply_text("📸 Пришли своё фото", reply_markup=back_menu())
-
-# ---------- ФОТО ----------
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-
-    if user_id not in users:
-        return
-
-    if users[user_id].get("step") == "photo":
-        users[user_id]["photo"] = update.message.photo[-1].file_id
-        users[user_id]["step"] = "done"
-
-        p = users[user_id]
-
-        await update.message.reply_photo(
-            photo=p["photo"],
-            caption=(
-                "✅ Анкета создана!\n\n"
-                f"👤 {p['name']}\n"
-                f"🎂 {p['age']} лет\n"
-                f"📍 {p['city']}\n"
-                f"🔎 Ищет: {p['search']}"
-            ),
-            reply_markup=main_menu()
-        )
-
-# ---------- ЗАПУСК ----------
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    app.run_polling()
 
 if __name__ == "__main__":
     main()
