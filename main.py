@@ -1,52 +1,25 @@
 import os
 import psycopg2
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
+# ================== CONFIG ==================
 TOKEN = os.getenv("BOT_TOKEN")
 DB_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DB_URL)
 conn.autocommit = True
 
-# ================== БАЗА ==================
-def init_db():
-    with conn.cursor() as c:
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            gender TEXT,
-            age INT,
-            city TEXT,
-            about TEXT,
-            looking TEXT,
-            photo TEXT
-        );
-        """)
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS likes (
-            from_id BIGINT,
-            to_id BIGINT,
-            UNIQUE(from_id, to_id)
-        );
-        """)
-
-# ================== КНОПКИ ==================
-def back():
-    return ReplyKeyboardMarkup([[KeyboardButton("⬅️ Назад")]], resize_keyboard=True)
-
-def menu():
-    return ReplyKeyboardMarkup(   
-[
-    ["📝 Рассказать о себе"],
-    ["👀 Найти своего человека"],
-    ["✍️ Редактировать анкету"],
-    ["🗑 Удалить анкету"]
-],
-        resize_keyboard=True
-    )
 # ================== TEXTS ==================
-
 WELCOME_TEXT = (
     "💗 <b>Добро пожаловать в «СвойЧеловек»</b>\n\n"
     "Это пространство для одиноких родителей,\n"
@@ -57,67 +30,81 @@ WELCOME_TEXT = (
     "и это нормально 🤍\n\n"
     "Здесь ты можешь найти:\n"
     "• близкого по духу человека\n"
-    "• подругу или друга для общения\n"
-    "• поддержку в важный период жизни\n"
-    "• или любовь, когда будешь к этому готов(а)\n\n"
-    "Давай начнём с анкеты —\n"
-    "она поможет другим увидеть тебя настоящего(ую).\n\n"
+    "• подругу или друга\n"
+    "• поддержку\n"
+    "• или любовь\n\n"
+    "Давай начнём с анкеты 👇"
 )
+
+# ================== DATABASE ==================
+def init_db():
+    with conn.cursor() as c:
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id BIGINT PRIMARY KEY,
+            gender TEXT,
+            name TEXT,
+            age INT,
+            city TEXT,
+            looking TEXT,
+            photo TEXT
+        );
+        """)
+
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS filters (
+            user_id BIGINT PRIMARY KEY,
+            city TEXT,
+            age_from INT,
+            age_to INT
+        );
+        """)
+
+# ================== KEYBOARDS ==================
+def main_menu():
+    return ReplyKeyboardMarkup(
+        [
+            ["📝 Рассказать о себе"],
+            ["👀 Поиск своего человека"],
+            ["⚙️ Фильтры"]
+        ],
+        resize_keyboard=True
+    )
+
+def back():
+    return ReplyKeyboardMarkup([["⬅️ Назад"]], resize_keyboard=True)
+
+def gender_kb():
+    return ReplyKeyboardMarkup(
+        [["Парень", "Девушка"], ["⬅️ Назад"]],
+        resize_keyboard=True
+    )
+
+def confirm_kb():
+    return ReplyKeyboardMarkup(
+        [["✅ Подтвердить"], ["⬅️ Назад"]],
+        resize_keyboard=True
+    )
 
 # ================== START ==================
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text(
         WELCOME_TEXT,
-        reply_markup=menu(),
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=main_menu()
     )
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
 
-async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-
-    if text == "📝 Рассказать о себе":
-        await update.message.reply_text(
-            "📝 Моя анкета\n\n"
-            "Расскажи о себе🙂"
-        )
-
-    elif text == "👀 Найти своего человека":
-        await update.message.reply_text(
-            "💞 Ищу твоего человека...\n"
-            "Подбираю анкеты для тебя"
-        )
-
-    elif text == "✍️ Редактировать анкету":
-        await update.message.reply_text(
-            "✍️ Что хочешь изменить?\n"
-            "Скоро добавим выбор 😉"
-        )
-
-    elif text == "🗑 Удалить анкету":
-        await update.message.reply_text(
-            "🗑 Анкета удалена"
-        )
-# ================== АНКЕТА ==================
+# ================== FORM ==================
 async def start_form(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
     await update.message.reply_text(
-        "Ты мужчина или женщина?",
-        reply_markup=ReplyKeyboardMarkup(
-            [["👨 Мужчина", "👩 Женщина"], ["⬅️ Назад"]],
-            resize_keyboard=True
-        )
+        "Парень или девушка?",
+        reply_markup=gender_kb()
     )
 
-async def handle_form(update, context):
+async def handle_text(update, context):
     text = update.message.text
     step = context.user_data.get("step")
 
@@ -127,6 +114,11 @@ async def handle_form(update, context):
 
     if step == "gender":
         context.user_data["gender"] = text
+        context.user_data["step"] = "name"
+        await update.message.reply_text("Как тебя зовут?", reply_markup=back())
+
+    elif step == "name":
+        context.user_data["name"] = text
         context.user_data["step"] = "age"
         await update.message.reply_text("Сколько тебе лет?", reply_markup=back())
 
@@ -136,195 +128,184 @@ async def handle_form(update, context):
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-        await update.message.reply_text(
-            "Откуда ты?\n\nМожешь отправить геолокацию 📍",
-            reply_markup=ReplyKeyboardMarkup(
-                [
-                    [KeyboardButton("📍 Отправить геолокацию", request_location=True)],
-                    ["⬅️ Назад"]
-                ],
-                resize_keyboard=True
-            )
-        )
+        await update.message.reply_text("Откуда ты?", reply_markup=back())
 
     elif step == "city":
-        context.user_data["city"] = text.strip().lower()
-        context.user_data["step"] = "about"
-        await update.message.reply_text("Расскажи о себе", reply_markup=back())
-
-    elif step == "about":
-        context.user_data["about"] = text
-        context.user_data["step"] = "looking"
-        await update.message.reply_text(
-            "Кого ищешь?",
-            reply_markup=ReplyKeyboardMarkup(
-                [
-                    ["👩 Подругу", "🤝 Друга"],
-                    ["👨 Парня", "👩‍❤️‍👨 Девушку"],
-                    ["⬅️ Назад"]
-                ],
-                resize_keyboard=True
-            )
-        )
+        context.user_data["city"] = text
+        context.user_data["step"] = "photo"
+        await update.message.reply_text("Загрузи фото", reply_markup=back())
 
     elif step == "looking":
         context.user_data["looking"] = text
-        context.user_data["step"] = "photo"
-        await update.message.reply_text("Пришли фото", reply_markup=back())
+        await confirm_profile(update, context)
 
-# ================== ГЕОЛОКАЦИЯ ==================
-async def handle_location(update, context):
-    if context.user_data.get("step") != "city":
-        return
-
-    # ⚠️ Без внешних API — город вводится вручную после гео
-    context.user_data["city"] = "unknown"
-    context.user_data["step"] = "about"
-
-    await update.message.reply_text(
-        "📍 Геолокация получена!\nТеперь напиши название города текстом ✍️",
-        reply_markup=back()
-    )
-
-# ================== ФОТО + СОХРАНЕНИЕ ==================
+# ================== PHOTO ==================
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
 
-    user_id = update.message.from_user.id
-    photo = update.message.photo[-1].file_id
+    context.user_data["photo"] = update.message.photo[-1].file_id
+    context.user_data["step"] = "looking"
+    await update.message.reply_text(
+        "Кого хочешь найти?",
+        reply_markup=back()
+    )
+
+# ================== CONFIRM ==================
+async def confirm_profile(update, context):
     d = context.user_data
+
+    text = (
+        f"📋 <b>Твоя анкета</b>\n\n"
+        f"👤 {d['gender']}\n"
+        f"📛 {d['name']}\n"
+        f"🎂 {d['age']}\n"
+        f"📍 {d['city']}\n"
+        f"💞 {d['looking']}"
+    )
+
+    await update.message.reply_photo(
+        photo=d["photo"],
+        caption=text,
+        parse_mode="HTML",
+        reply_markup=confirm_kb()
+    )
+
+# ================== SAVE ==================
+async def save_profile(update, context):
+    d = context.user_data
+    user_id = update.message.from_user.id
 
     with conn.cursor() as c:
         c.execute("""
         INSERT INTO users VALUES (%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (user_id) DO UPDATE SET
         gender=EXCLUDED.gender,
+        name=EXCLUDED.name,
         age=EXCLUDED.age,
         city=EXCLUDED.city,
-        about=EXCLUDED.about,
         looking=EXCLUDED.looking,
         photo=EXCLUDED.photo
         """, (
             user_id,
             d["gender"],
+            d["name"],
             d["age"],
             d["city"],
-            d["about"],
             d["looking"],
-            photo
+            d["photo"]
         ))
 
-    await update.message.reply_photo(
-        photo=photo,
-        caption="✅ Анкета сохранена",
-        reply_markup=menu()
-    )
     context.user_data.clear()
+    await update.message.reply_text(
+        "✅ Анкета сохранена!",
+        reply_markup=main_menu()
+    )
 
-# ================== ПРОСМОТР (ГОРОД + LOOKING) ==================
-async def view_profiles(update, context):
+# ================== FILTERS ==================
+async def start_filters(update, context):
+    context.user_data["filter_step"] = "city"
+    await update.message.reply_text(
+        "📍 Город (или «любой»):",
+        reply_markup=back()
+    )
+
+async def handle_filters(update, context):
+    text = update.message.text
+    step = context.user_data.get("filter_step")
+
+    if step == "city":
+        context.user_data["f_city"] = None if text.lower() == "любой" else text
+        context.user_data["filter_step"] = "age_from"
+        await update.message.reply_text("🎂 Минимальный возраст:")
+
+    elif step == "age_from":
+        context.user_data["f_age_from"] = int(text)
+        context.user_data["filter_step"] = "age_to"
+        await update.message.reply_text("🎂 Максимальный возраст:")
+
+    elif step == "age_to":
+        user_id = update.message.from_user.id
+
+        with conn.cursor() as c:
+            c.execute("""
+            INSERT INTO filters VALUES (%s,%s,%s,%s)
+            ON CONFLICT (user_id) DO UPDATE SET
+            city=EXCLUDED.city,
+            age_from=EXCLUDED.age_from,
+            age_to=EXCLUDED.age_to
+            """, (
+                user_id,
+                context.user_data["f_city"],
+                context.user_data["f_age_from"],
+                int(text)
+            ))
+
+        context.user_data.clear()
+        await update.message.reply_text(
+            "✅ Фильтры сохранены",
+            reply_markup=main_menu()
+        )
+
+# ================== SEARCH ==================
+async def search_profiles(update, context):
     user_id = update.message.from_user.id
-    context.user_data["index"] = 0
 
     with conn.cursor() as c:
-        c.execute(
-            "SELECT city, looking FROM users WHERE user_id=%s",
-            (user_id,)
-        )
-        row = c.fetchone()
+        c.execute("SELECT city, age_from, age_to FROM filters WHERE user_id=%s", (user_id,))
+        f = c.fetchone()
 
-        if not row:
-            await update.message.reply_text("Сначала создай анкету 👇", reply_markup=menu())
-            return
-
-        city, looking = row
+        city, age_from, age_to = (None, 18, 100)
+        if f:
+            city, age_from, age_to = f
 
         c.execute("""
-        SELECT u.user_id, u.gender, u.age, u.city, u.about, u.photo
-        FROM users u
-        WHERE u.user_id != %s
-          AND u.city = %s
-          AND u.looking = %s
-          AND NOT EXISTS (
-              SELECT 1 FROM likes l
-              WHERE l.from_id = %s AND l.to_id = u.user_id
-          )
-        LIMIT 50
-        """, (user_id, city, looking, user_id))
+        SELECT gender,name,age,city,looking,photo
+        FROM users
+        WHERE user_id != %s
+        AND age BETWEEN %s AND %s
+        AND (%s IS NULL OR city=%s)
+        ORDER BY RANDOM()
+        LIMIT 1
+        """, (user_id, age_from, age_to, city, city))
 
-        context.user_data["profiles"] = c.fetchall()
+        row = c.fetchone()
 
-    await show_profile(update, context)
-
-async def show_profile(update, context):
-    profiles = context.user_data.get("profiles", [])
-    i = context.user_data.get("index", 0)
-
-    if i >= len(profiles):
-        await update.message.reply_text(
-            "Анкеты по твоим параметрам закончились 😔",
-            reply_markup=menu()
-        )
+    if not row:
+        await update.message.reply_text("Анкет нет 😔", reply_markup=main_menu())
         return
 
-    uid, gender, age, city, about, photo = profiles[i]
-    context.user_data["current"] = uid
-
-    await update.message.reply_photo(
-        photo=photo,
-        caption=f"{gender}\n🎂 {age}\n📍 {city}\n\n{about}",
-        reply_markup=ReplyKeyboardMarkup(
-            [["❤️ Лайк", "➡️ Дальше", "⏭ Пропустить"], ["⬅️ Назад"]],
-            resize_keyboard=True
-        )
+    text = (
+        f"👤 {row[0]}\n"
+        f"📛 {row[1]}\n"
+        f"🎂 {row[2]}\n"
+        f"📍 {row[3]}\n"
+        f"💞 {row[4]}"
     )
 
-# ================== ЛАЙК ==================
-async def like(update, context):
-    user = update.message.from_user.id
-    target = context.user_data.get("current")
+    await update.message.reply_photo(photo=row[5], caption=text)
 
-    with conn.cursor() as c:
-        c.execute(
-            "INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
-            (user, target)
-        )
-        c.execute(
-            "SELECT 1 FROM likes WHERE from_id=%s AND to_id=%s",
-            (target, user)
-        )
-        if c.fetchone():
-            await update.message.reply_text("💞 У вас мэтч!")
-
-    context.user_data["index"] += 1
-    await show_profile(update, context)
-
-# ================== УДАЛЕНИЕ ==================
-async def delete_profile(update, context):
-    user = update.message.from_user.id
-    with conn.cursor() as c:
-        c.execute("DELETE FROM users WHERE user_id=%s", (user,))
-        c.execute("DELETE FROM likes WHERE from_id=%s OR to_id=%s", (user, user))
-    await update.message.reply_text("Анкета удалена", reply_markup=menu())
-
-# ================== РОУТЕР ==================
+# ================== ROUTER ==================
 async def router(update, context):
-    t = update.message.text
+    text = update.message.text
 
-    if t == "📝 Создать / Редактировать анкету":
+    if text == "📝 Рассказать о себе":
         await start_form(update, context)
-    elif t == "👀 Смотреть анкеты":
-        await view_profiles(update, context)
-    elif t == "❤️ Лайк":
-        await like(update, context)
-    elif t in ["➡️ Дальше", "⏭ Пропустить"]:
-        context.user_data["index"] += 1
-        await show_profile(update, context)
-    elif t == "🗑 Удалить анкету":
-        await delete_profile(update, context)
+
+    elif text == "✅ Подтвердить":
+        await save_profile(update, context)
+
+    elif text == "⚙️ Фильтры":
+        await start_filters(update, context)
+
+    elif text == "👀 Поиск своего человека":
+        await search_profiles(update, context)
+
+    elif context.user_data.get("filter_step"):
+        await handle_filters(update, context)
+
     else:
-        await handle_form(update, context)
+        await handle_text(update, context)
 
 # ================== MAIN ==================
 def main():
@@ -332,7 +313,6 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
