@@ -57,10 +57,26 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Без спешки. Без давления."
         )
 
-    elif text == "👀 Смотреть анкеты":
+   elif text == "👀 Смотреть анкеты":
+    shown = False
+
+    for uid, profile in users.items():
+        if uid != user_id and profile.get("step") == "done":
+            await update.message.reply_photo(
+                photo=profile["photo"],
+                caption=
+                f"👤 {profile['name']}\n"
+                f"🎂 {profile['age']} лет\n"
+                f"📍 {profile['city']}"
+            )
+            shown = True
+            break
+
+    if not shown:
         await update.message.reply_text(
-            "🔧 Раздел в разработке.\n"
-            "Скоро здесь появятся анкеты 💫"
+            "Пока нет анкет для просмотра 😔\n"
+            "Загляни чуть позже"
+        )
         )
 
     else:
