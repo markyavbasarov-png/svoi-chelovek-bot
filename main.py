@@ -408,36 +408,55 @@ async def router(update, context):
         await start_profile(update, context)
 
     # ===== ПОИСК ЛЮДЕЙ =====
-    elif text == "Поиск людей":
-    user_id = update.message.from_user.id
+    async def router(update, context):
+    text = update.message.text
 
-    with conn.cursor() as c:
-        c.execute(
-            "SELECT 1 FROM users WHERE user_id = %s",
-            (user_id,)
-        )
-        exists = c.fetchone()
+    if text == "Моя анкета":
+        await show_my_profile(update, context)
 
-     if not exists:
-        await update.message.reply_text(
-            "Сначала нужно заполнить анкету 🤍"
-        )
+    elif text == "✏️ Редактировать анкету":
+        await edit_profile(update, context)
+
+    elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
+        await save_profile(update, context)
+
+    elif text == "Изменить":
         await start_profile(update, context)
-        return
 
-    context.user_data["shown_users"] = []
-    await search_people(update, context)
+    # ===== ПОИСК ЛЮДЕЙ =====
+    elif text == "Поиск людей":
+        user_id = update.message.from_user.id
 
-     elif text == "❤️ Дальше":
-    await search_people(update, context)
+        with conn.cursor() as c:
+            c.execute(
+                "SELECT 1 FROM users WHERE user_id = %s",
+                (user_id,)
+            )
+            exists = c.fetchone()
 
-     elif text == "❌ Стоп":
-    context.user_data.clear()
-    await update.message.reply_text(
-        "Поиск остановлен 🤍",
-        reply_markup=menu_after_profile()
-    )
+        if not exists:
+            await update.message.reply_text(
+                "Сначала нужно заполнить анкету 🤍"
+            )
+            await start_profile(update, context)
+            return
 
+        context.user_data["shown_users"] = []
+        await search_people(update, context)
+
+    elif text == "❤️ Дальше":
+        await search_people(update, context)
+
+    elif text == "❌ Стоп":
+        context.user_data.clear()
+        await update.message.reply_text(
+            "Поиск остановлен 🤍",
+            reply_markup=menu_after_profile()
+        )
+
+    # ===== ВСЁ ОСТАЛЬНОЕ =====
+    else:
+        await handle_text(update, context)
     # ===== ВСЁ ОСТАЛЬНОЕ =====
     else:
         await handle_text(update, context)
