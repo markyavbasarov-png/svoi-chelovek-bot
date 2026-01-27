@@ -145,16 +145,35 @@ async def handle_text(update, context):
         )
 
     elif step == "photo" and text == "Пропустить":
-        context.user_data["photo"] = None
-        context.user_data["step"] = "looking"
-        await update.message.reply_text(
-            "Кого ты хочешь найти?\n\n"
-            "— хочу найти друзей\n"
-            "— ищу поддержку\n"
-            "— хочется общения\n"
-            "— открыт(а) к отношениям"
-        )
+    context.user_data["photo"] = None
+    context.user_data["step"] = "looking"
+    await update.message.reply_text(
+        "Кого ты хочешь найти?\n\n"
+        "- хочу найти друзей\n"
+        "- ищу поддержку\n"
+        "- хочется общения\n"
+        "- открыт(а) к отношениям"
+    )
 
+    elif step == "looking":
+    context.user_data["looking"] = text
+    context.user_data["step"] = "confirm"
+
+    name = context.user_data.get("name")
+    age = context.user_data.get("age")
+    city = context.user_data.get("city")
+    goal = context.user_data.get("looking")
+
+    text_profile = (
+        f"👤 {name}, {age} лет\n"
+        f"📍 {city}\n"
+        f"🎯 {goal}"
+    )
+
+    await update.message.reply_text(
+        "Спасибо 🤍\nВот как тебя увидят другие:\n\n" + text_profile,
+        reply_markup=confirm_keyboard()
+    )
     
 
 
@@ -174,7 +193,21 @@ async def handle_photo(update, context):
         "— ищу поддержку\n"
         "— хочется общения\n"
         "— открыт(а) к отношениям"
+   step = context.user_data.get("step")
+
+if step == "city":
+    context.user_data["city"] = text
+    context.user_data["step"] = "looking"
+
+    await update.message.reply_text(
+        "Отлично 🤍\n\n"
+        "Кого ты хочешь найти?\n\n"
+        "— хочу найти друзей\n"
+        "— ищу поддержку\n"
+        "— хочется общения\n"
+        "— открыт(а) к отношениям"
     )
+
 elif step == "looking":
     context.user_data["looking"] = text
     context.user_data["step"] = "confirm"
@@ -188,6 +221,11 @@ elif step == "looking":
         f"📍 {d['city']}\n"
         f"🎯 {d['looking']}\n\n"
         "Всё верно?"
+    )
+
+    await update.message.reply_text(
+        profile_view,
+        reply_markup=confirm_kb()
     )
 
     await update.message.reply_text(
@@ -225,9 +263,12 @@ async def save_profile(update, context):
     context.user_data.clear()
 
 await update.message.reply_text(
-    "Готово 🤍\nХочешь посмотреть анкеты?",
-    reply_markup=after_confirm_kb()
+    "Готово 🤍\nПоказываю анкеты 👇"
 )
+
+await show_next_profile(update, context)
+
+
 
 # ================== МОЯ АНКЕТА ==================
 async def show_my_profile(update, context):
@@ -308,7 +349,51 @@ async def edit_profile(update, context):
         "Ты всегда можешь изменить ответы.",
         reply_markup=gender_kb()
     )
+# кнопки
+def like_dislike_kb():
+    ...
 
+# сохранение анкеты
+async def save_profile(update, context):
+    ...
+
+# показ следующей анкеты 👇
+async def show_next_profile(update, context):
+    user_id = update.message.from_user.id
+
+    with conn.cursor() as c:
+        c.execute("""
+            SELECT user_id, name, age, city, looking, photo
+            FROM users
+            WHERE user_id != %s
+            ORDER BY last_seen DESC
+            LIMIT 1
+        """, (user_id,))
+        row = c.fetchone()
+
+    if not row:
+        await update.message.reply_text("Пока анкет нет 😔")
+        return
+
+    uid, name, age, city, looking, photo = row
+
+    text = (
+        f"👤 {name}, {age} лет\n"
+        f"📍 {city}\n"
+        f"🎯 {looking}"
+    )
+
+    if photo:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=like_dislike_kb()
+        )
+    else:
+        await update.message.reply_text(
+            text,
+            reply_markup=like_dislike_kb()
+        )
 # ================== ROUTER / ПОИСК ЛЮДЕЙ ================== 
 async def router(update, context):
     if not update.message or not update.message.text:
