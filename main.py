@@ -28,16 +28,10 @@ def init_db():
             age INT,
             city TEXT,
             looking TEXT,
-            photo TEXT
+            photo TEXT,
+            last_seen TIMESTAMP DEFAULT NOW()
         );
         """)
-
-
-# ================== ТЕКСТ ==================
-WELCOME_TEXT = (
-    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
-    "Давай начнём с анкеты ✨"
-)
 
 
 # ================== КНОПКИ ==================
@@ -52,7 +46,8 @@ def menu_after_profile():
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton("Моя анкета")],
-            [KeyboardButton("✏️ Редактировать анкету")]
+            [KeyboardButton("✏️ Редактировать анкету")],
+            [KeyboardButton("Поиск людей")]
         ],
         resize_keyboard=True
     )
@@ -83,7 +78,7 @@ def confirm_kb():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
-        WELCOME_TEXT,
+        "💗 Добро пожаловать в «СвойЧеловек»\n\nДавай начнём с анкеты ✨",
         reply_markup=menu_start()
     )
 
@@ -106,7 +101,7 @@ async def handle_text(update, context):
     if step == "gender" and text in ("Парень", "Девушка"):
         context.user_data["gender"] = text
         context.user_data["step"] = "name"
-        await update.message.reply_text("Как тебя зовут?")
+        await update.message.reply_text("Как тебя зовут? 🤍")
 
     elif step == "name":
         context.user_data["name"] = text
@@ -115,17 +110,17 @@ async def handle_text(update, context):
 
     elif step == "age":
         if not text.isdigit():
-            await update.message.reply_text("Возраст цифрами 🙂")
+            await update.message.reply_text("Напиши возраст цифрами 🙂")
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-        await update.message.reply_text("Откуда ты?")
+        await update.message.reply_text("Откуда ты? 🤍")
 
     elif step == "city":
         context.user_data["city"] = text
         context.user_data["step"] = "photo"
         await update.message.reply_text(
-            "Добавим фото?",
+            "Хочешь добавить фото?",
             reply_markup=photo_kb()
         )
 
@@ -148,7 +143,7 @@ async def handle_text(update, context):
         )
 
     elif step == "confirm" and text == "Подтвердить":
-        await save_profile(update, context)
+        await confirm_profile(update, context)
 
     elif step == "confirm" and text == "Изменить":
         await start_profile(update, context)
@@ -176,21 +171,21 @@ async def ask_looking(update):
 
 
 # ================== СОХРАНЕНИЕ ==================
-async def save_profile(update, context):
+async def confirm_profile(update, context):
     user_id = update.effective_user.id
     d = context.user_data
 
     with conn.cursor() as c:
         c.execute("""
-        INSERT INTO users (user_id, gender, name, age, city, looking, photo)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (user_id) DO UPDATE SET
-            gender = EXCLUDED.gender,
-            name = EXCLUDED.name,
-            age = EXCLUDED.age,
-            city = EXCLUDED.city,
-            looking = EXCLUDED.looking,
-            photo = EXCLUDED.photo
+            INSERT INTO users (user_id, gender, name, age, city, looking, photo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                gender = EXCLUDED.gender,
+                name = EXCLUDED.name,
+                age = EXCLUDED.age,
+                city = EXCLUDED.city,
+                looking = EXCLUDED.looking,
+                photo = EXCLUDED.photo
         """, (
             user_id,
             d["gender"],
@@ -201,13 +196,12 @@ async def save_profile(update, context):
             d["photo"]
         ))
 
-    context.user_data.clear()
-
     await update.message.reply_text(
-        "💖 Анкета сохранена!",
+        "💖 Анкета сохранена!\n\nВот твоя анкета 👇",
         reply_markup=menu_after_profile()
     )
 
+    context.user_data.clear()
     await show_my_profile(update, context)
 
 
@@ -217,8 +211,8 @@ async def show_my_profile(update, context):
 
     with conn.cursor() as c:
         c.execute("""
-        SELECT name, age, city, looking, photo
-        FROM users WHERE user_id = %s
+            SELECT name, age, city, looking, photo
+            FROM users WHERE user_id = %s
         """, (user_id,))
         row = c.fetchone()
 
@@ -235,7 +229,7 @@ async def show_my_profile(update, context):
         await update.message.reply_text(text)
 
 
-# ================= ROUTER =================
+# ================== ROUTER ==================
 async def router(update, context):
     if not update.message or not update.message.text:
         return
@@ -244,13 +238,15 @@ async def router(update, context):
 
     if text == "Создать анкету":
         await start_profile(update, context)
+
     elif text == "Моя анкета":
         await show_my_profile(update, context)
+
     else:
         await handle_text(update, context)
 
 
-# ================= MAIN =================
+# ================== MAIN ==================
 def main():
     init_db()
 
