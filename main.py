@@ -115,9 +115,7 @@ async def handle_text(update, context):
     if step == "gender" and text in ["Парень", "Девушка"]:
         context.user_data["gender"] = text
         context.user_data["step"] = "name"
-        await update.message.reply_text(
-            "Как тебя зовут?🤍"
-        )
+        await update.message.reply_text("Как тебя зовут? 🤍")
 
     elif step == "name":
         context.user_data["name"] = text
@@ -130,9 +128,7 @@ async def handle_text(update, context):
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-        await update.message.reply_text(
-            "Откуда ты?🤍"
-        )
+        await update.message.reply_text("Откуда ты? 🤍")
 
     elif step == "city":
         context.user_data["city"] = text
@@ -145,93 +141,34 @@ async def handle_text(update, context):
         )
 
     elif step == "photo" and text == "Пропустить":
-    context.user_data["photo"] = None
-    context.user_data["step"] = "looking"
-    await update.message.reply_text(
-        "Кого ты хочешь найти?\n\n"
-        "- хочу найти друзей\n"
-        "- ищу поддержку\n"
-        "- хочется общения\n"
-        "- открыт(а) к отношениям"
-    )
-    
+        context.user_data["photo"] = None
+        context.user_data["step"] = "looking"
+        await update.message.reply_text(
+            "Кого ты хочешь найти?\n\n"
+            "— хочу найти друзей\n"
+            "— ищу поддержку\n"
+            "— хочется общения\n"
+            "— открыт(а) к отношениям"
+        )
+
     elif step == "looking":
-    context.user_data["looking"] = text
-    context.user_data["step"] = "confirm"
+        context.user_data["looking"] = text
+        context.user_data["step"] = "confirm"
 
-    name = context.user_data.get("name")
-    age = context.user_data.get("age")
-    city = context.user_data.get("city")
-    goal = context.user_data.get("looking")
+        d = context.user_data
+        profile_view = (
+            "Спасибо 🤍\nВот как тебя увидят другие:\n\n"
+            f"👤 {d['name']}, {d['age']} лет\n"
+            f"📍 {d['city']}\n"
+            f"🎯 {d['looking']}\n\n"
+            "Всё верно?"
+        )
 
-    text_profile = (
-        f"👤 {name}, {age} лет\n"
-        f"📍 {city}\n"
-        f"🎯 {goal}"
-    )
-
-    await update.message.reply_text(
-        "Спасибо 🤍\nВот как тебя увидят другие:\n\n" + text_profile,
-        reply_markup=confirm_keyboard()
-    )
-    
-
-
-# ================== ФОТО ==================
-async def handle_photo(update, context):
-    if context.user_data.get("step") != "photo":
-        return
-
-    photo = update.message.photo[-1]
-    context.user_data["photo"] = photo.file_id
-    context.user_data["step"] = "looking"
-
-    await update.message.reply_text(
-        "Отлично 🤍\n\n"
-        "Кого ты хочешь найти?\n\n"
-        "— хочу найти друзей\n"
-        "— ищу поддержку\n"
-        "— хочется общения\n"
-        "— открыт(а) к отношениям"
-   step = context.user_data.get("step")
-
-if step == "city":
-    context.user_data["city"] = text
-    context.user_data["step"] = "looking"
-
-    await update.message.reply_text(
-        "Отлично 🤍\n\n"
-        "Кого ты хочешь найти?\n\n"
-        "— хочу найти друзей\n"
-        "— ищу поддержку\n"
-        "— хочется общения\n"
-        "— открыт(а) к отношениям"
-    )
-
-elif step == "looking":
-    context.user_data["looking"] = text
-    context.user_data["step"] = "confirm"
-
-    d = context.user_data
-
-    profile_view = (
-        "Спасибо 🤍\n"
-        "Вот как тебя увидят другие:\n\n"
-        f"👤 {d['name']}, {d['age']} лет\n"
-        f"📍 {d['city']}\n"
-        f"🎯 {d['looking']}\n\n"
-        "Всё верно?"
-    )
-
-    await update.message.reply_text(
-        profile_view,
-        reply_markup=confirm_kb()
-    )
-
-    await update.message.reply_text(
-        profile_view,
-        reply_markup=confirm_kb()
-    )
+        await update.message.reply_text(
+            profile_view,
+            reply_markup=confirm_kb()
+        )
+       
 
 # ================== СОХРАНЕНИЕ ==================
 async def save_profile(update, context):
@@ -349,51 +286,23 @@ async def edit_profile(update, context):
         "Ты всегда можешь изменить ответы.",
         reply_markup=gender_kb()
     )
-# кнопки
-def like_dislike_kb():
-    ...
 
-# сохранение анкеты
-async def save_profile(update, context):
-    ...
-
-# показ следующей анкеты 👇
-async def show_next_profile(update, context):
-    user_id = update.message.from_user.id
-
-    with conn.cursor() as c:
-        c.execute("""
-            SELECT user_id, name, age, city, looking, photo
-            FROM users
-            WHERE user_id != %s
-            ORDER BY last_seen DESC
-            LIMIT 1
-        """, (user_id,))
-        row = c.fetchone()
-
-    if not row:
-        await update.message.reply_text("Пока анкет нет 😔")
+ async def handle_photo(update, context):
+    if context.user_data.get("step") != "photo":
         return
 
-    uid, name, age, city, looking, photo = row
+    photo = update.message.photo[-1]
+    context.user_data["photo"] = photo.file_id
+    context.user_data["step"] = "looking"
 
-    text = (
-        f"👤 {name}, {age} лет\n"
-        f"📍 {city}\n"
-        f"🎯 {looking}"
+    await update.message.reply_text(
+        "Отлично 🤍\n\n"
+        "Кого ты хочешь найти?\n\n"
+        "— хочу найти друзей\n"
+        "— ищу поддержку\n"
+        "— хочется общения\n"
+        "— открыт(а) к отношениям"
     )
-
-    if photo:
-        await update.message.reply_photo(
-            photo=photo,
-            caption=text,
-            reply_markup=like_dislike_kb()
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            reply_markup=like_dislike_kb()
-        )
 # ================== ROUTER / ПОИСК ЛЮДЕЙ ================== 
 async def router(update, context):
     if not update.message or not update.message.text:
@@ -458,7 +367,13 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # команда старт
     app.add_handler(CommandHandler("start", start))
+
+    # 👇 ОБЯЗАТЕЛЬНО ВЫШЕ текстового
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
+    # весь текст сюда
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
     app.run_polling()
@@ -466,4 +381,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
