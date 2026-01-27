@@ -401,14 +401,14 @@ async def router(update, context):
     elif text == "✏️ Редактировать анкету":
         await edit_profile(update, context)
 
-     elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
+    elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
         await save_profile(update, context)
 
-     elif text == "Изменить":
+    elif text == "Изменить":
         await start_profile(update, context)
 
     # ===== ПОИСК ЛЮДЕЙ =====
-     elif text == "Поиск людей":
+    elif text == "Поиск людей":
     user_id = update.message.from_user.id
 
     with conn.cursor() as c:
