@@ -247,6 +247,16 @@ async def router(update, context):
     elif text == "Изменить":
         await start_profile(update, context)
 
+    elif text == "Загрузить фото":
+        if context.user_data.get("step") == "photo":
+            await update.message.reply_text(
+                "Хорошо 🙂\nОтправь фото одним сообщением 📸"
+            )
+        else:
+            await update.message.reply_text(
+                "Сейчас фото не требуется."
+            )
+
     elif text == "Поиск людей":
         await update.message.reply_text(
             "Ты в разделе поиска 🤍\n\n"
