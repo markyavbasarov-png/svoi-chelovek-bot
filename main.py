@@ -1,213 +1,292 @@
-import logging
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
+import os
+import psycopg2
+from datetime import timedelta
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-API_TOKEN = "PASTE_YOUR_TOKEN_HERE"
+# ================== CONFIG ==================
+TOKEN = os.getenv("BOT_TOKEN")
+DB_URL = os.getenv("DATABASE_URL")
 
-logging.basicConfig(level=logging.INFO)
+conn = psycopg2.connect(DB_URL)
+conn.autocommit = True
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot, storage=MemoryStorage())
+# ================== TEXTS ==================
+WELCOME_TEXT = (
+    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
+    "Здесь можно найти не просто знакомство —\n"
+    "а друга, подругу, поддержку или любовь.\n\n"
+    "Это пространство для тех,\n"
+    "кто устал быть сильным в одиночку\n"
+    "и хочет, чтобы его поняли 🤍\n\n"
+    "Здесь не оценивают и не торопят.\n"
+    "Здесь принимают такими, какие вы есть.\n\n"
+    "Давай начнём с анкеты ✨"
+)
 
-# -------------------------
-# ВРЕМЕННОЕ ХРАНИЛИЩЕ
-# -------------------------
-users = {}       # анкеты
-likes = {}       # кто кого лайкнул
+# ================== DB ==================
+def init_db():
+    with conn.cursor() as c:
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id BIGINT PRIMARY KEY,
+            gender TEXT,
+            name TEXT,
+            age INT,
+            city TEXT,
+            looking TEXT,
+            photo TEXT,
+            last_seen TIMESTAMP
+        );
+        """)
 
-# -------------------------
-# FSM
-# -------------------------
-class анкета(StatesGroup):
-    gender = State()
-    name = State()
-    age = State()
-    city = State()
-    photo = State()
-    goal = State()
-    confirm = State()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            id SERIAL PRIMARY KEY,
+            from_user BIGINT,
+            to_user BIGINT,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        """)
 
-# -------------------------
-# /start
-# -------------------------
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Моя анкета")
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS blocked_users (
+            user_id BIGINT PRIMARY KEY,
+            blocked_at TIMESTAMP DEFAULT NOW()
+        );
+        """)
 
-    await message.answer(
-        "💗 Добро пожаловать в «СвойЧеловек»\n\n"
-        "Здесь можно найти не просто знакомство —\n"
-        "а друга, подругу, поддержку или любовь.\n\n"
-        "Давай начнём с анкеты ✨",
-        reply_markup=kb
+# ================== KEYBOARDS ==================
+def menu_start():
+    return ReplyKeyboardMarkup([["📝 Моя анкета"]], resize_keyboard=True)
+
+def menu_after_profile():
+    return ReplyKeyboardMarkup(
+        [["👤 Моя анкета"], ["🔍 Поиск людей"]],
+        resize_keyboard=True
     )
 
-# -------------------------
-# МОЯ АНКЕТА
-# -------------------------
-@dp.message_handler(lambda m: m.text == "Моя анкета")
-async def my_profile(message: types.Message):
-    if message.from_user.id in users:
-        u = users[message.from_user.id]
-        text = (
-            f"👤 {u['name']}, {u['age']}\n"
-            f"📍 {u['city']}\n"
-            f"💭 {u['goal']}"
+def back():
+    return ReplyKeyboardMarkup([["⬅️ Назад"]], resize_keyboard=True)
+
+# ================== UTILS ==================
+def update_last_seen(user_id):
+    with conn.cursor() as c:
+        c.execute(
+            "UPDATE users SET last_seen = NOW() WHERE user_id=%s",
+            (user_id,)
         )
 
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add("Поиск людей")
-        kb.add("Изменить анкету")
+# ================== START ==================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
 
-        await message.answer(text, reply_markup=kb)
-    else:
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add("Парень", "Девушка")
-        await message.answer("Кто ты?", reply_markup=kb)
-        await анкета.gender.set()
+    with conn.cursor() as c:
+        c.execute("SELECT last_seen FROM users WHERE user_id=%s", (user_id,))
+        row = c.fetchone()
 
-# -------------------------
-# СОЗДАНИЕ АНКЕТЫ
-# -------------------------
-@dp.message_handler(state=анкета.gender)
-async def set_gender(message: types.Message, state: FSMContext):
-    await state.update_data(gender=message.text)
-    await message.answer("Как тебя зовут?")
-    await анкета.name.set()
+    if row and row[0]:
+        if (update.message.date - row[0]) > timedelta(days=7):
+            await update.message.reply_text(
+                "Мы снова рядом 🤍\n\n"
+                "В поиске появились новые люди.\n"
+                "Можно вернуться в своём темпе.",
+                reply_markup=menu_after_profile()
+            )
+            update_last_seen(user_id)
+            return
 
-@dp.message_handler(state=анкета.name)
-async def set_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer("Сколько тебе лет?")
-    await анкета.age.set()
+    await update.message.reply_text(WELCOME_TEXT, reply_markup=menu_start())
+    update_last_seen(user_id)
 
-@dp.message_handler(state=анкета.age)
-async def set_age(message: types.Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("Пожалуйста, введи число 🙂")
-        return
-    await state.update_data(age=int(message.text))
-    await message.answer("Откуда ты?")
-    await анкета.city.set()
-
-@dp.message_handler(state=анкета.city)
-async def set_city(message: types.Message, state: FSMContext):
-    await state.update_data(city=message.text)
-
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Загрузить фото", "Пропустить")
-
-    await message.answer("Хочешь добавить фото?", reply_markup=kb)
-    await анкета.photo.set()
-
-@dp.message_handler(lambda m: m.text == "Пропустить", state=анкета.photo)
-async def skip_photo(message: types.Message, state: FSMContext):
-    await state.update_data(photo=None)
-    await message.answer(
-        "Кого ты хочешь найти здесь?\n\n"
-        "Например:\n"
-        "Хочу найти друзей\n"
-        "Ищу поддержку\n"
-        "Хочу отношений"
+# ================== FORM ==================
+async def start_form(update, context):
+    context.user_data.clear()
+    context.user_data["step"] = "gender"
+    await update.message.reply_text(
+        "Кто ты?",
+        reply_markup=ReplyKeyboardMarkup(
+            [["Парень", "Девушка"]],
+            resize_keyboard=True
+        )
     )
-    await анкета.goal.set()
 
-@dp.message_handler(content_types=types.ContentType.PHOTO, state=анкета.photo)
-async def save_photo(message: types.Message, state: FSMContext):
-    await state.update_data(photo=message.photo[-1].file_id)
-    await message.answer("Кого ты хочешь найти здесь?")
-    await анкета.goal.set()
+async def handle_text(update, context):
+    text = update.message.text
+    step = context.user_data.get("step")
 
-@dp.message_handler(state=анкета.goal)
-async def set_goal(message: types.Message, state: FSMContext):
-    await state.update_data(goal=message.text)
-    data = await state.get_data()
+    if text == "⬅️ Назад":
+        await start(update, context)
+        return
 
+    if step == "gender":
+        context.user_data["gender"] = text
+        context.user_data["step"] = "name"
+        await update.message.reply_text("Как тебя зовут?")
+
+    elif step == "name":
+        context.user_data["name"] = text
+        context.user_data["step"] = "age"
+        await update.message.reply_text("Сколько тебе лет?")
+
+    elif step == "age":
+        if not text.isdigit():
+            await update.message.reply_text("Введите возраст числом")
+            return
+        context.user_data["age"] = int(text)
+        context.user_data["step"] = "city"
+        await update.message.reply_text("Откуда ты?")
+
+    elif step == "city":
+        context.user_data["city"] = text
+        context.user_data["step"] = "photo"
+        await update.message.reply_text(
+            "Хочешь добавить фото?",
+            reply_markup=ReplyKeyboardMarkup(
+                [["Загрузить фото", "Пропустить"]],
+                resize_keyboard=True
+            )
+        )
+
+    elif step == "looking":
+        context.user_data["looking"] = text
+        await confirm_profile(update, context)
+
+# ================== PHOTO ==================
+async def handle_photo(update, context):
+    if context.user_data.get("step") != "photo":
+        return
+
+    context.user_data["photo"] = update.message.photo[-1].file_id
+    context.user_data["step"] = "looking"
+    await update.message.reply_text("Кого ты хочешь найти?")
+
+# ================== CONFIRM ==================
+async def confirm_profile(update, context):
+    d = context.user_data
     text = (
-        f"👤 {data['name']}, {data['age']}\n"
-        f"📍 {data['city']}\n"
-        f"💭 {data['goal']}\n\n"
+        "Вот как выглядит твоя анкета:\n\n"
+        f"{d['gender']}\n"
+        f"{d['name']}, {d['age']}\n"
+        f"{d['city']}\n"
+        f"{d['looking']}\n\n"
         "Всё верно?"
     )
 
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Подтвердить", "Изменить")
-
-    if data.get("photo"):
-        await message.answer_photo(data["photo"], caption=text, reply_markup=kb)
+    if d.get("photo"):
+        await update.message.reply_photo(
+            photo=d["photo"],
+            caption=text,
+            reply_markup=ReplyKeyboardMarkup(
+                [["✅ Подтвердить", "✏️ Изменить"]],
+                resize_keyboard=True
+            )
+        )
     else:
-        await message.answer(text, reply_markup=kb)
+        await update.message.reply_text(
+            text,
+            reply_markup=ReplyKeyboardMarkup(
+                [["✅ Подтвердить", "✏️ Изменить"]],
+                resize_keyboard=True
+            )
+        )
 
-    await анкета.confirm.set()
+# ================== SAVE ==================
+async def save_profile(update, context):
+    d = context.user_data
+    user_id = update.message.from_user.id
 
-@dp.message_handler(lambda m: m.text == "Подтвердить", state=анкета.confirm)
-async def confirm_profile(message: types.Message, state: FSMContext):
-    users[message.from_user.id] = await state.get_data()
-    await state.finish()
+    with conn.cursor() as c:
+        c.execute("""
+        INSERT INTO users VALUES (%s,%s,%s,%s,%s,%s,NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+        gender=EXCLUDED.gender,
+        name=EXCLUDED.name,
+        age=EXCLUDED.age,
+        city=EXCLUDED.city,
+        looking=EXCLUDED.looking,
+        photo=EXCLUDED.photo,
+        last_seen=NOW()
+        """, (
+            user_id,
+            d["gender"],
+            d["name"],
+            d["age"],
+            d["city"],
+            d["looking"],
+            d.get("photo")
+        ))
 
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Моя анкета", "Поиск людей")
+    context.user_data.clear()
+    await update.message.reply_text(
+        "Готово 🤍 Анкета сохранена.",
+        reply_markup=menu_after_profile()
+    )
 
-    await message.answer("Готово 🤍 Анкета сохранена.", reply_markup=kb)
+# ================== MY PROFILE ==================
+async def show_my_profile(update, context):
+    user_id = update.message.from_user.id
+    with conn.cursor() as c:
+        c.execute(
+            "SELECT gender, name, age, city, looking, photo FROM users WHERE user_id=%s",
+            (user_id,)
+        )
+        row = c.fetchone()
 
-@dp.message_handler(lambda m: m.text == "Изменить", state="*")
-async def edit_profile(message: types.Message, state: FSMContext):
-    await state.finish()
-    users.pop(message.from_user.id, None)
-    await message.answer("Давай создадим анкету заново ✨")
-    await my_profile(message)
-
-# -------------------------
-# ПОИСК
-# -------------------------
-@dp.message_handler(lambda m: m.text == "Поиск людей")
-async def search(message: types.Message):
-    if message.from_user.id not in users:
-        await message.answer("Сначала нужно заполнить анкету 🤍")
+    if not row:
+        await update.message.reply_text("Анкета не найдена 🤍")
         return
 
-    for uid, u in users.items():
-        if uid != message.from_user.id:
-            text = (
-                f"👤 {u['name']}, {u['age']}\n"
-                f"📍 {u['city']}\n"
-                f"💭 {u['goal']}"
-            )
+    gender, name, age, city, looking, photo = row
+    text = (
+        "Твоя анкета:\n\n"
+        f"{gender}\n{name}, {age}\n{city}\n{looking}"
+    )
 
-            kb = types.InlineKeyboardMarkup()
-            kb.add(
-                types.InlineKeyboardButton("❤️ Откликается", callback_data=f"like_{uid}"),
-                types.InlineKeyboardButton("➡️ Дальше", callback_data="next")
-            )
-
-            if u.get("photo"):
-                await message.answer_photo(u["photo"], caption=text, reply_markup=kb)
-            else:
-                await message.answer(text, reply_markup=kb)
-            return
-
-    await message.answer("Анкеты закончились 🤍")
-
-# -------------------------
-# ЛАЙКИ / МЭТЧ
-# -------------------------
-@dp.callback_query_handler(lambda c: c.data.startswith("like_"))
-async def like(callback: types.CallbackQuery):
-    target = int(callback.data.split("_")[1])
-    me = callback.from_user.id
-
-    likes.setdefault(target, set()).add(me)
-
-    if me in likes.get(target, set()) and target in likes.get(me, set()):
-        await callback.message.answer("💫 У вас взаимный интерес!")
+    if photo:
+        await update.message.reply_photo(photo=photo, caption=text)
     else:
-        await callback.message.answer("❤️ Лайк отправлен")
+        await update.message.reply_text(text)
 
-    await callback.answer()
+# ================== ROUTER ==================
+async def router(update, context):
+    text = update.message.text
 
-# -------------------------
+    if text == "📝 Моя анкета":
+        await start_form(update, context)
+
+    elif text == "✅ Подтвердить":
+        await save_profile(update, context)
+
+    elif text == "👤 Моя анкета":
+        await show_my_profile(update, context)
+
+    elif text == "🔍 Поиск людей":
+        await update.message.reply_text(
+            "Поиск скоро будет доступен 🤍\n"
+            "Мы подбираем людей аккуратно."
+        )
+
+    else:
+        await handle_text(update, context)
+
+# ================== MAIN ==================
+def main():
+    init_db()
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+
+    app.run_polling()
+
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    main()
