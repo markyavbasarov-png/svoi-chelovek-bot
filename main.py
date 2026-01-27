@@ -34,26 +34,7 @@ def init_db():
         """)
 
 
-# ================== КНОПКИ ==================
-def menu_start():
-    return ReplyKeyboardMarkup(
-        [["Моя анкета"]],
-        resize_keyboard=True
-    )
 
-
-def menu_after_profile():
-    return ReplyKeyboardMarkup(
-        [
-            ["Моя анкета"],
-            ["Поиск людей"]
-        ],
-        resize_keyboard=True
-    )
-
-
-def back_menu():
-    return ReplyKeyboardMarkup([["⬅️ Назад"]], resize_keyboard=True)
 
 
 # ================== СТАРТ ==================
@@ -76,165 +57,167 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=menu_start()
     )
 
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 
-# ================== СОЗДАНИЕ АНКЕТЫ ==================
+# ================== КНОПКИ ==================
+
+def gender_kb():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
+        resize_keyboard=True
+    )
+
+def photo_kb():
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("📸 Загрузить фото")],
+            [KeyboardButton("Пропустить")]
+        ],
+        resize_keyboard=True
+    )
+
+def confirm_kb():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Подтвердить"), KeyboardButton("Изменить")]],
+        resize_keyboard=True
+    )
+
+def menu_after_profile():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Моя анкета"), KeyboardButton("Поиск людей")]],
+        resize_keyboard=True
+    )
+
+# ================== СТАРТ АНКЕТЫ ==================
+
 async def start_profile(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
 
     await update.message.reply_text(
-        "Кто ты?",
-        reply_markup=ReplyKeyboardMarkup(
-            [["Парень", "Девушка"]],
-            resize_keyboard=True
-        )
+        "Выбери вариант 🤍",
+        reply_markup=gender_kb()
     )
 
+# ================== ТЕКСТОВАЯ ЛОГИКА ==================
 
 async def handle_text(update, context):
     text = update.message.text
     step = context.user_data.get("step")
 
-    if text == "⬅️ Назад":
-        await start(update, context)
-        return
-
-    if step == "gender":
+    # ПОЛ
+    if step == "gender" and text in ["Парень", "Девушка"]:
         context.user_data["gender"] = text
         context.user_data["step"] = "name"
+
         await update.message.reply_text(
-            "Как тебя зовут?\nМожно имя или ник — как тебе комфортно.",
-            reply_markup=back_menu()
+            "Как тебя зовут?\nМожно имя или ник — как тебе комфортно 🤍"
         )
 
+    # ИМЯ
     elif step == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "age"
+
         await update.message.reply_text(
-            "Сколько тебе лет?\nВозраст нужен только для подбора.",
-            reply_markup=back_menu()
+            "Сколько тебе лет?"
         )
 
+    # ВОЗРАСТ
     elif step == "age":
         if not text.isdigit():
-            await update.message.reply_text("Пожалуйста, введи число 🙂")
+            await update.message.reply_text("Напиши возраст цифрами 🙂")
             return
+
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
+
         await update.message.reply_text(
-            "Откуда ты?\nГород или страна — как удобно.",
-            reply_markup=back_menu()
+            "Откуда ты?\nГород или страна — как удобно 🤍"
         )
 
+    # ГОРОД
     elif step == "city":
         context.user_data["city"] = text
         context.user_data["step"] = "photo"
+
         await update.message.reply_text(
-            "Хочешь добавить фото?\nС фото проще понять, кто ты.",
-            reply_markup=ReplyKeyboardMarkup(
-                [["Загрузить фото", "Пропустить"]],
-                resize_keyboard=True
-            )
+            "Хочешь добавить фото?\n"
+            "С фото людям проще понять, кто ты.\n"
+            "Но это не обязательно 🤍",
+            reply_markup=photo_kb()
         )
 
+    # ПРОПУСК ФОТО
+    elif step == "photo" and text == "Пропустить":
+        context.user_data["photo"] = None
+        context.user_data["step"] = "looking"
+
+        await update.message.reply_text(
+            "Кого ты хочешь найти?\n\n"
+            "— хочу найти друзей\n"
+            "— ищу поддержку\n"
+            "— хочется общения\n"
+            "— открыт(а) к отношениям"
+        )
+
+    # ЦЕЛЬ
     elif step == "looking":
         context.user_data["looking"] = text
-        await confirm_profile(update, context)
+        context.user_data["step"] = "confirm"
 
+        d = context.user_data
+
+        profile_view = (
+            "Спасибо 🤍\n"
+            "Вот как тебя увидят другие:\n\n"
+            f"{d['name']}\n\n"
+            f"{d['looking']}\n\n"
+            "Всё верно?"
+        )
+
+        await update.message.reply_text(
+            profile_view,
+            reply_markup=confirm_kb()
+        )
 
 # ================== ФОТО ==================
+
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
 
-    context.user_data["photo"] = update.message.photo[-1].file_id
+    photo = update.message.photo[-1]
+    context.user_data["photo"] = photo.file_id
     context.user_data["step"] = "looking"
 
     await update.message.reply_text(
-        "Кого ты хочешь найти здесь?\nМожно написать своими словами."
+        "Отлично 🤍\n\n"
+        "Кого ты хочешь найти?\n\n"
+        "— хочу найти друзей\n"
+        "— ищу поддержку\n"
+        "— хочется общения\n"
+        "— открыт(а) к отношениям"
     )
-
-    await update.message.reply_text(
-        "Например:\n"
-        "Хочу найти друзей\n"
-        "Ищу поддержку\n"
-        "Хочу отношений\n"
-        "Пока просто пообщаться"
-    )
-
-
-# ================== ПОДТВЕРЖДЕНИЕ ==================
-async def confirm_profile(update, context):
-    d = context.user_data
-
-    text = (
-        "Спасибо 🤍\n"
-        "Вот как сейчас выглядит твоя анкета:\n\n"
-        f"Пол: {d['gender']}\n"
-        f"Имя: {d['name']}\n"
-        f"Возраст: {d['age']}\n"
-        f"Город: {d['city']}\n"
-        f"Цель: {d['looking']}\n\n"
-        "Всё верно?"
-    )
-
-    if d.get("photo"):
-        await update.message.reply_photo(
-            photo=d["photo"],
-            caption=text,
-            reply_markup=ReplyKeyboardMarkup(
-                [["Подтвердить", "Изменить"]],
-                resize_keyboard=True
-            )
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            reply_markup=ReplyKeyboardMarkup(
-                [["Подтвердить", "Изменить"]],
-                resize_keyboard=True
-            )
-        )
-
 
 # ================== СОХРАНЕНИЕ ==================
+
 async def save_profile(update, context):
-    d = context.user_data
-    user_id = update.message.from_user.id
-
-    with conn.cursor() as c:
-        c.execute("""
-        INSERT INTO users (
-            user_id, gender, name, age, city, looking, photo, last_seen
-        )
-        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
-        ON CONFLICT (user_id) DO UPDATE SET
-            gender = EXCLUDED.gender,
-            name = EXCLUDED.name,
-            age = EXCLUDED.age,
-            city = EXCLUDED.city,
-            looking = EXCLUDED.looking,
-            photo = EXCLUDED.photo,
-            last_seen = NOW()
-        """, (
-            user_id,
-            d["gender"],
-            d["name"],
-            d["age"],
-            d["city"],
-            d["looking"],
-            d.get("photo")
-        ))
-
+    # здесь можешь сохранить в PostgreSQL
     context.user_data.clear()
 
     await update.message.reply_text(
-        "Готово 🤍 Твоя анкета сохранена.",
+        "Готово 🤍\n"
+        "Твоя анкета сохранена.\n\n"
+        "Теперь ты можешь:\n"
+        "– смотреть анкеты других\n"
+        "– находить близких по духу людей\n"
+        "– общаться и знакомиться",
         reply_markup=menu_after_profile()
     )
 
-
 # ================== РОУТЕР ==================
+
 async def router(update, context):
     text = update.message.text
 
@@ -247,41 +230,12 @@ async def router(update, context):
     elif text == "Изменить":
         await start_profile(update, context)
 
-    elif text == "Загрузить фото":
-        if context.user_data.get("step") == "photo":
-            await update.message.reply_text(
-                "Хорошо 🙂\nОтправь фото одним сообщением 📸"
-            )
-        else:
-            await update.message.reply_text(
-                "Сейчас фото не требуется."
-            )
-
     elif text == "Поиск людей":
         await update.message.reply_text(
             "Ты в разделе поиска 🤍\n\n"
-            "Здесь можно спокойно смотреть анкеты других людей.\n"
-            "Функция поиска скоро будет доступна.",
+            "Функция скоро будет доступна.",
             reply_markup=menu_after_profile()
         )
 
     else:
         await handle_text(update, context)
-
-
-# ================== MAIN ==================
-def main():
-    init_db()
-
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
-
-    print("Бот запущен")
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
