@@ -322,78 +322,7 @@ async def edit_profile(update, context):
     )
 
 # ================== ПОИСК ЛЮДЕЙ ================== 
-async def search_people(update, context):
-    user_id = update.message.from_user.id
-
-    # список уже показанных
-    shown = context.user_data.get("shown_users", [])
-
-    # не показываем самого себя
-    if user_id not in shown:
-        shown.append(user_id)
-
-    context.user_data["shown_users"] = shown
-
-    with conn.cursor() as c:
-        if shown:
-            c.execute(
-                """
-                SELECT user_id, name, age, city
-                FROM users
-                WHERE user_id NOT IN %s
-                ORDER BY RANDOM()
-                LIMIT 1
-                """,
-                (tuple(shown),)
-            )
-        else:
-            c.execute(
-                """
-                SELECT user_id, name, age, city
-                FROM users
-                ORDER BY RANDOM()
-                LIMIT 1
-                """
-            )
-
-        person = c.fetchone()
-
-    if not person:
-        await update.message.reply_text(
-            "Пока больше никого нет 🤍",
-            reply_markup=menu_after_profile()
-        )
-        return
-
-    other_id, name, age, city = person
-    shown.append(other_id)
-    context.user_data["shown_users"] = shown
-
-    await update.message.reply_text(
-        f"💞 {name}, {age}\n🏙 {city}",
-        reply_markup=search_kb()
-    )
-
-        
-# ================== РОУТЕР ==================
 async def router(update, context):
-    text = update.message.text
-
-    
-    if text == "Моя анкета":
-        await show_my_profile(update, context)
-
-    elif text == "✏️ Редактировать анкету":
-        await edit_profile(update, context)
-
-    elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
-        await save_profile(update, context)
-
-    elif text == "Изменить":
-        await start_profile(update, context)
-
-    # ===== ПОИСК ЛЮДЕЙ =====
-    async def router(update, context):
     text = update.message.text
 
     if text == "Моя анкета":
@@ -419,7 +348,7 @@ async def router(update, context):
             )
             exists = c.fetchone()
 
-    if not exists:
+        if not exists:
             await update.message.reply_text(
                 "Сначала нужно заполнить анкету 🤍"
             )
@@ -439,9 +368,6 @@ async def router(update, context):
             reply_markup=menu_after_profile()
         )
 
-    # ===== ВСЁ ОСТАЛЬНОЕ =====
-    else:
-        await handle_text(update, context)
     # ===== ВСЁ ОСТАЛЬНОЕ =====
     else:
         await handle_text(update, context)
