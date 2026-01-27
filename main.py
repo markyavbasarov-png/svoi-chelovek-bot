@@ -394,20 +394,21 @@ async def search_people(update, context):
 async def router(update, context):
     text = update.message.text
 
-    if text == "Моя анкета":
+    
+if text == "Моя анкета":
         await show_my_profile(update, context)
 
-    elif text == "✏️ Редактировать анкету":
+elif text == "✏️ Редактировать анкету":
         await edit_profile(update, context)
 
-    elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
+elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
         await save_profile(update, context)
 
-    elif text == "Изменить":
+elif text == "Изменить":
         await start_profile(update, context)
 
     # ===== ПОИСК ЛЮДЕЙ =====
- elif text == "Поиск людей":
+elif text == "Поиск людей":
     user_id = update.message.from_user.id
 
     with conn.cursor() as c:
@@ -417,7 +418,7 @@ async def router(update, context):
         )
         exists = c.fetchone()
 
-    if not exists:
+if not exists:
         await update.message.reply_text(
             "Сначала нужно заполнить анкету 🤍"
         )
