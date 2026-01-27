@@ -1,220 +1,133 @@
-import os
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
-from telegram import Update, ReplyKeyboardMarkup
+import sqlite3
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton
+)
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters,
+    filters
 )
 
-# ================= LOGGING =================
+# ================== НАСТРОЙКИ ==================
+TOKEN = "YOUR_BOT_TOKEN_HERE"
+DB_NAME = "profiles.db"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
-logger = logging.getLogger(__name__)
 
-# ================= ENV =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN не задан")
-
-if not DATABASE_URL:
-    raise RuntimeError("❌ DATABASE_URL не задан")
-
-# ================= DB =================
-def get_connection():
-    return psycopg2.connect(
-        DATABASE_URL,
-        sslmode="require",
-        cursor_factory=RealDictCursor
-    )
-
+# ================== БАЗА ДАННЫХ ==================
 def init_db():
-    try:
-        conn = get_connection()
-        with conn.cursor() as c:
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
-                username TEXT,
-                gender TEXT,
-                age INT,
-                city TEXT,
-                looking TEXT,
-                about TEXT,
-                photo_id TEXT
-            );
-            """)
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS likes (
-                from_user BIGINT,
-                to_user BIGINT,
-                UNIQUE(from_user, to_user)
-            );
-            """)
-            conn.commit()
-        conn.close()
-        logger.info("✅ DB initialized")
-    except Exception:
-        logger.exception("❌ Ошибка инициализации БД")
-        raise
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS profiles (
+            user_id INTEGER PRIMARY KEY,
+            photo_id TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-# ================= KEYBOARDS =================
+# ================== КЛАВИАТУРА ==================
 main_keyboard = ReplyKeyboardMarkup(
     [
-        ["🔍 Смотреть анкеты"],
-        ["❤️ Совпадения"],
-        ["👤 Моя анкета"],
-        ["➕ Создать анкету"]
+        [KeyboardButton("🔍 Смотреть анкеты")],
+        [KeyboardButton("❤️ Совпадения")],
+        [KeyboardButton("👤 Моя анкета")],
+        [KeyboardButton("➕ Создать анкету")]
     ],
     resize_keyboard=True
 )
 
-# ================= START =================
+# ================== ХЕНДЛЕРЫ ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    logger.info(f"/start by {update.effective_user.id}")
     await update.message.reply_text(
-        "💖 Добро пожаловать в «СвойЧеловек»",
+        "💖 Добро пожаловать в «СвойЧеловек»!\n\n"
+        "Нажми «Создать анкету», чтобы начать 👇",
         reply_markup=main_keyboard
     )
 
-# ================= CREATE PROFILE =================
-async def create_profile(update, context):
-    logger.info(f"Создание анкеты: {update.effective_user.id}")
+async def create_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    context.user_data["step"] = "gender"
-    await update.message.reply_text("Ты парень или девушка?")
+    await update.message.reply_text(
+        "📸 Пришли одно фото"
+    )
 
-async def handle_profile(update, context):
-    step = context.user_data.get("step")
-    text = update.message.text
-
-    if step == "gender":
-        context.user_data["gender"] = text
-        context.user_data["step"] = "age"
-        await update.message.reply_text("Возраст?")
-        return
-
-    if step == "age":
-        if not text.isdigit():
-            await update.message.reply_text("Введите число")
-            return
-        context.user_data["age"] = int(text)
-        context.user_data["step"] = "city"
-        await update.message.reply_text("Город?")
-        return
-
-    if step == "city":
-        context.user_data["city"] = text
-        context.user_data["step"] = "looking"
-        await update.message.reply_text("Кого ищешь?")
-        return
-
-    if step == "looking":
-        context.user_data["looking"] = text
-        context.user_data["step"] = "about"
-        await update.message.reply_text("О себе")
-        return
-
-    if step == "about":
-        context.user_data["about"] = text
-        context.user_data["step"] = "photo"
-        await update.message.reply_text("Пришли одно фото 📸")
-        return
-
-# ================= PHOTO =================
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("step") != "photo":
-        return
-
     try:
-        photo_id = update.message.photo[-1].file_id
-        data = context.user_data
-        user = update.effective_user
+        user_id = update.effective_user.id
 
-        conn = get_connection()
-        with conn.cursor() as c:
-            c.execute("""
-                INSERT INTO users (
-                    user_id, username, gender, age, city, looking, about, photo_id
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (user_id) DO UPDATE SET
-                    username = EXCLUDED.username,
-                    gender = EXCLUDED.gender,
-                    age = EXCLUDED.age,
-                    city = EXCLUDED.city,
-                    looking = EXCLUDED.looking,
-                    about = EXCLUDED.about,
-                    photo_id = EXCLUDED.photo_id
-            """, (
-                user.id,
-                user.username,
-                data["gender"],
-                data["age"],
-                data["city"],
-                data["looking"],
-                data["about"],
-                photo_id
-            ))
-            conn.commit()
+        if not update.message.photo:
+            await update.message.reply_text("❌ Фото не получено. Попробуй ещё раз.")
+            return
+
+        photo_id = update.message.photo[-1].file_id
+
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+
+        c.execute("""
+            INSERT INTO profiles (user_id, photo_id)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET photo_id=excluded.photo_id
+        """, (user_id, photo_id))
+
+        conn.commit()
         conn.close()
 
-        caption = (
-            f"👤 {data['gender']}, {data['age']}\n"
-            f"📍 {data['city']}\n"
-            f"🎯 {data['looking']}\n\n"
-            f"💬 {data['about']}"
-        )
-
-        await update.message.reply_photo(
-            photo=photo_id,
-            caption=caption,
-            reply_markup=main_keyboard
-        )
-
-        context.user_data.clear()
-        logger.info(f"✅ Анкета сохранена: {user.id}")
-
-    except Exception:
-        logger.exception("❌ Ошибка при сохранении анкеты")
         await update.message.reply_text(
-            "❌ Ошибка при сохранении анкеты.\nНажми «Создать анкету» и попробуй ещё раз.",
+            "✅ Анкета сохранена!",
             reply_markup=main_keyboard
         )
-        context.user_data.clear()
 
-# ================= ROUTER =================
-async def router(update, context):
-    text = update.message.text
+    except Exception as e:
+        logging.exception("Ошибка при сохранении анкеты")
+        await update.message.reply_text(
+            "❌ Ошибка при сохранении анкеты.\n"
+            "Нажми «Создать анкету» и попробуй ещё раз."
+        )
 
-    if text == "➕ Создать анкету":
-        await create_profile(update, context)
-    elif context.user_data.get("step"):
-        await handle_profile(update, context)
-    else:
-        await update.message.reply_text("Выбери действие ⬇️", reply_markup=main_keyboard)
+async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
 
-# ================= MAIN =================
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT photo_id FROM profiles WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        await update.message.reply_text(
+            "❌ Анкета не найдена.\nНажми «Создать анкету»"
+        )
+        return
+
+    await update.message.reply_photo(
+        photo=row[0],
+        caption="👤 Твоя анкета",
+        reply_markup=main_keyboard
+    )
+
+# ================== ЗАПУСК ==================
 def main():
     init_db()
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.Regex("^➕ Создать анкету$"), create_profile))
+    app.add_handler(MessageHandler(filters.Regex("^👤 Моя анкета$"), my_profile))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
-    logger.info("🚀 Бот запущен")
-    app.run_polling(close_loop=False)
+    logging.info("🚀 Бот запущен")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
