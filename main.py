@@ -253,19 +253,21 @@ async def router(update, context):
     else:
         await handle_text(update, context)
         
-        # ================= MAIN =================
-        def main():
-            init_db()
+ # ================= MAIN =================
+def main():
+    init_db()
 
-            app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-            # /start
-            app.add_handler(CommandHandler("start", start))
+    # /start — ТОЛЬКО CommandHandler
+    app.add_handler(CommandHandler("start", start))
 
-            # фото (важно: раньше текста)
-            app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    # фото (ВАЖНО: раньше текста)
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-            # весь текст → router
-            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+    # весь обычный текст → router
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, router)
+    )
 
-            app.run_polling()
+    app.run_polling()
