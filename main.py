@@ -180,40 +180,10 @@ async def ask_looking(update):
 
 
 # ================== СОХРАНЕНИЕ ==================
-async def save_profile(update, context):
-    d = context.user_data
-    user_id = update.message.from_user.id
-
-    with conn.cursor() as c:
-        c.execute("""
-        INSERT INTO users (user_id, gender, name, age, city, looking, photo)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (user_id) DO UPDATE SET
-            gender=EXCLUDED.gender,
-            name=EXCLUDED.name,
-            age=EXCLUDED.age,
-            city=EXCLUDED.city,
-            looking=EXCLUDED.looking,
-            photo=EXCLUDED.photo,
-            last_seen=NOW()
-        """, (
-            user_id,
-            d["gender"],
-            d["name"],
-            d["age"],
-            d["city"],
-            d["looking"],
-            d["photo"],
-        ))
-
-    context.user_data.clear()
-
+async def show_my_profile(update, context):
     await update.message.reply_text(
-        "Анкета сохранена 🤍\n\nЧто будем делать дальше?",
-        reply_markup=menu_after_profile()
+        "Раздел «Моя анкета» скоро будет доступен 🤍"
     )
-
-
 # ================== МОЯ АНКЕТА ==================
 async def show_my_profile(update, context):
     user_id = update.message.from_user.id
