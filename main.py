@@ -111,7 +111,7 @@ async def handle_profile(update, context):
         await update.message.reply_text("Пришли одно фото 📸")
         return
 
-# ================= PHOTO (ПОКАЗ АНКЕТЫ СРАЗУ) =================
+# ================= PHOTO (ПОКАЗ АНКЕТЫ) =================
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
@@ -157,6 +157,7 @@ async def handle_photo(update, context):
         reply_markup=main_keyboard
     )
 
+    # ОЧИЩАЕМ ТОЛЬКО ПОСЛЕ ПОКАЗА
     context.user_data.clear()
 
 # ================= FILTER + SHOW =================
@@ -204,81 +205,21 @@ async def show_profile(update, context):
         return
 
     context.user_data["current_profile"] = profile[0]
-    _, username, gender, age, city, looking, about, photo_id = profile
+    _, _, gender, age, city, looking, about, photo_id = profile
 
     text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
 
-    if photo_id:
-        await update.message.reply_photo(photo_id, caption=text, reply_markup=browse_keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=browse_keyboard)
+    await update.message.reply_photo(photo_id, caption=text, reply_markup=browse_keyboard)
 
-# ================= LIKE =================
-async def like_profile(update, context):
-    from_user = update.effective_user.id
-    to_user = context.user_data.get("current_profile")
-    if not to_user:
-        return
+# ================= MAIN =================
+def main():
+    init_db()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_profile))
+    app.run_polling()
 
-    conn = get_connection()
-    with conn.cursor() as c:
-        c.execute(
-            "INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
-            (from_user, to_user)
-        )
-
-        c.execute("""
-        SELECT u.username
-        FROM likes l
-        JOIN users u ON u.user_id = l.from_user
-        WHERE l.from_user=%s AND l.to_user=%s
-        """, (to_user, from_user))
-
-        match = c.fetchone()
-        conn.commit()
-    conn.close()
-
-    if match:
-        link = f"https://t.me/{match[0]}" if match[0] else "Нет username"
-        await update.message.reply_text(f"💞 Взаимная симпатия!\n👉 {link}")
-
-    await show_profile(update, context)
-
-# ================= MATCHES =================
-async def show_matches(update, context):
-    conn = get_connection()
-    with conn.cursor() as c:
-        c.execute("""
-        SELECT u.username
-        FROM likes a
-        JOIN likes b ON a.from_user=b.to_user AND a.to_user=b.from_user
-        JOIN users u ON u.user_id=a.to_user
-        WHERE a.from_user=%s
-        """, (update.effective_user.id,))
-        matches = c.fetchall()
-    conn.close()
-
-    if not matches:
-        await update.message.reply_text("Пока нет совпадений 💔")
-        return
-
-    text = "💞 Твои совпадения:\n\n"
-    for m in matches:
-        if m[0]:
-            text += f"👉 https://t.me/{m[0]}\n"
-
-    await update.message.reply_text(text)
-
-# ================= MY PROFILE =================
-async def my_profile(update, context):
-    conn = get_connection()
-    with conn.cursor() as c:
-        c.execute("""
-        SELECT gender, age, city, looking, about, photo_id
-        FROM users WHERE user_id=%s
-        """, (update.effective_user.id,))
-        p = c.fetchone()
-    conn.close()
-
-    if not p:
-        await update.message
+if __name__ == "__main__":
+    main()
