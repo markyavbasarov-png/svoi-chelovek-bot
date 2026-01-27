@@ -86,12 +86,7 @@ def confirm_kb():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()  # 🔥 обязательно
 
-    await update.message.reply_text(
-        "Привет 🤍\n\n"
-        "Я помогу тебе найти своего человека.\n"
-        "Давай начнём с анкеты 👇",
-        reply_markup=main_menu()
-    )
+    
 
 
 # ================== СОЗДАНИЕ АНКЕТЫ ==================
