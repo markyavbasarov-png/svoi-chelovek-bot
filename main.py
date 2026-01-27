@@ -143,8 +143,7 @@ async def handle_text(update, context):
             "Но это не обязательно 🤍",
             reply_markup=photo_kb()
         )
-
-    elif step == "photo" and text == "Пропустить":
+     elif step == "photo" and text == "Пропустить":
     context.user_data["photo"] = None
     context.user_data["step"] = "looking"
     await update.message.reply_text(
@@ -154,7 +153,7 @@ async def handle_text(update, context):
         "- хочется общения\n"
         "- открыт(а) к отношениям"
     )
-
+    
     elif step == "looking":
     context.user_data["looking"] = text
     context.user_data["step"] = "confirm"
