@@ -101,7 +101,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
         WELCOME_TEXT,
-        reply_markup=menu_start()
+        reply_markup=menu_after_profile()
     )
 
 
