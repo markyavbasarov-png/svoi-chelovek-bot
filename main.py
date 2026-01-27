@@ -170,7 +170,22 @@ async def handle_text(update, context):
             reply_markup=confirm_kb()
         )
        
+# ================== ФОТО ==================
+async def handle_photo(update, context):
+    if context.user_data.get("step") != "photo":
+        return
 
+    photo = update.message.photo[-1]
+    context.user_data["photo"] = photo.file_id
+    context.user_data["step"] = "looking"
+
+    await update.message.reply_text(
+        "Кого ты хочешь найти?\n\n"
+        "— хочу найти друзей\n"
+        "— ищу поддержку\n"
+        "— хочется общения\n"
+        "— открыт(а) к отношениям"
+    )
 # ================== СОХРАНЕНИЕ ==================
 async def save_profile(update, context):
     d = context.user_data
@@ -288,22 +303,6 @@ async def edit_profile(update, context):
         reply_markup=gender_kb()
     )
 
- async def handle_photo(update, context):
-    if context.user_data.get("step") != "photo":
-        return
-
-    photo = update.message.photo[-1]
-    context.user_data["photo"] = photo.file_id
-    context.user_data["step"] = "looking"
-
-    await update.message.reply_text(
-        "Отлично 🤍\n\n"
-        "Кого ты хочешь найти?\n\n"
-        "— хочу найти друзей\n"
-        "— ищу поддержку\n"
-        "— хочется общения\n"
-        "— открыт(а) к отношениям"
-    )
 # ================== ROUTER / ПОИСК ЛЮДЕЙ ================== 
 async def router(update, context):
     if not update.message or not update.message.text:
