@@ -51,8 +51,14 @@ WELCOME_TEXT = (
     "Давай начнём с анкеты ✨"
 )
 
-
 # ================== КНОПКИ ==================
+def menu_start():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Создать анкету")]],
+        resize_keyboard=True
+    )
+
+
 def menu_after_profile():
     return ReplyKeyboardMarkup(
         [
@@ -63,11 +69,13 @@ def menu_after_profile():
         resize_keyboard=True
     )
 
+
 def gender_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
         resize_keyboard=True
     )
+
 
 def photo_kb():
     return ReplyKeyboardMarkup(
@@ -75,37 +83,20 @@ def photo_kb():
         resize_keyboard=True
     )
 
+
 def confirm_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Подтвердить"), KeyboardButton("Изменить")]],
         resize_keyboard=True
     )
-def search_kb():
-    return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("❤️ Дальше")],
-            [KeyboardButton("❌ Стоп")]
-        ],
-        resize_keyboard=True
-    )
-
-def menu_after_profile():
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton("Моя анкета"), KeyboardButton("Поиск людей")]],
-        resize_keyboard=True
-    )
-
-
-# ================== /start ==================
+  # ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
         WELCOME_TEXT,
-        reply_markup=menu_after_profile()
+        reply_markup=menu_start()
     )
-
-
-# ================== СОЗДАНИЕ АНКЕТЫ ==================
+    # ================== СОЗДАНИЕ АНКЕТЫ ==================
 async def start_profile(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
@@ -283,7 +274,7 @@ async def show_my_profile(update, context):
 
 # ================== РЕДАКТИРОВАНИЕ ==================
 async def edit_profile(update, context):
-    user_id = update.message.from_user.idе
+    user_id = update.message.from_user.id
 
     with conn.cursor() as c:
         c.execute("""
@@ -327,7 +318,10 @@ async def router(update, context):
 
     if text == "Моя анкета":
         await show_my_profile(update, context)
-
+    
+    elif text == "Создать анкету":
+    await start_profile(update, context)
+ 
     elif text == "✏️ Редактировать анкету":
         await edit_profile(update, context)
 
