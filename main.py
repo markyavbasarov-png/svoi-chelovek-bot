@@ -85,15 +85,34 @@ def confirm_kb():
     )
 
 
-# ================== /start ==================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
+# ============ ПОДТВЕРЖДЕНИЕ АНКЕТЫ ============
+async def confirm_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    data = context.user_data
+
+    with conn.cursor() as c:
+        c.execute("""
+            INSERT INTO users (user_id, gender, age, city, goal)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                gender = EXCLUDED.gender,
+                age = EXCLUDED.age,
+                city = EXCLUDED.city,
+                goal = EXCLUDED.goal
+        """, (
+            user_id,
+            data.get("gender"),
+            data.get("age"),
+            data.get("city"),
+            data.get("goal")
+        ))
 
     await update.message.reply_text(
-        WELCOME_TEXT,
-        reply_markup=menu_start()
+        "💖 Анкета сохранена!\n\n"
+        "Скоро подберём тебе людей ✨"
     )
 
+    context.user_data.clear()
 
 # ================== СОЗДАНИЕ АНКЕТЫ ==================
 async def start_profile(update, context):
