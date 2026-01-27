@@ -1,16 +1,18 @@
- import os
+import os
 import psycopg2
+from datetime import datetime
+
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
-    KeyboardButton,
+    KeyboardButton
 )
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters,
+    filters
 )
 
 # ================== НАСТРОЙКИ ==================
@@ -39,13 +41,6 @@ def init_db():
 
 
 # ================== КНОПКИ ==================
-def menu_start():
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton("Моя анкета")]],
-        resize_keyboard=True
-    )
-
-
 def gender_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
@@ -70,7 +65,7 @@ def confirm_kb():
     )
 
 
-def menu_after_profile():
+def main_menu_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Моя анкета"), KeyboardButton("Поиск людей")]],
         resize_keyboard=True
@@ -81,20 +76,19 @@ def menu_after_profile():
 WELCOME_TEXT = (
     "💗 Добро пожаловать в «СвойЧеловек»\n\n"
     "Здесь можно найти не просто знакомство —\n"
-    "а друга, подругу, поддержку или любовь.\n\n"
+    "а друга, поддержку или любовь 🤍\n\n"
     "Давай начнём с анкеты ✨"
 )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        WELCOME_TEXT,
-        reply_markup=menu_start()
-    )
+    context.user_data.clear()
+    await update.message.reply_text(WELCOME_TEXT)
+    await start_profile(update, context)
 
 
-# ================== СТАРТ АНКЕТЫ ==================
-async def start_profile(update, context):
+# ================== АНКЕТА ==================
+async def start_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     context.user_data["step"] = "gender"
 
@@ -104,8 +98,7 @@ async def start_profile(update, context):
     )
 
 
-# ================== ТЕКСТОВАЯ ЛОГИКА ==================
-async def handle_text(update, context):
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     step = context.user_data.get("step")
 
@@ -113,38 +106,27 @@ async def handle_text(update, context):
     if step == "gender" and text in ["Парень", "Девушка"]:
         context.user_data["gender"] = text
         context.user_data["step"] = "name"
-
-        await update.message.reply_text(
-            "Как тебя зовут?\nМожно имя или ник 🤍"
-        )
+        await update.message.reply_text("Как тебя зовут? 🤍")
 
     # ИМЯ
     elif step == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "age"
-
-        await update.message.reply_text(
-            "Сколько тебе лет?"
-        )
+        await update.message.reply_text("Сколько тебе лет?")
 
     # ВОЗРАСТ
     elif step == "age":
         if not text.isdigit():
             await update.message.reply_text("Напиши возраст цифрами 🙂")
             return
-
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-
-        await update.message.reply_text(
-            "Откуда ты?\nГород или страна 🤍"
-        )
+        await update.message.reply_text("Откуда ты? Город или страна 🤍")
 
     # ГОРОД
     elif step == "city":
         context.user_data["city"] = text
         context.user_data["step"] = "photo"
-
         await update.message.reply_text(
             "Хочешь добавить фото?\n"
             "С фото людям проще понять, кто ты.\n"
@@ -152,17 +134,10 @@ async def handle_text(update, context):
             reply_markup=photo_kb()
         )
 
-    # КНОПКА ЗАГРУЗИТЬ ФОТО
-    elif step == "photo" and text == "📸 Загрузить фото":
-        await update.message.reply_text(
-            "Хорошо 😊\nОтправь фото одним сообщением"
-        )
-
     # ПРОПУСК ФОТО
     elif step == "photo" and text == "Пропустить":
         context.user_data["photo"] = None
         context.user_data["step"] = "looking"
-
         await update.message.reply_text(
             "Кого ты хочешь найти?\n\n"
             "— хочу найти друзей\n"
@@ -177,23 +152,19 @@ async def handle_text(update, context):
         context.user_data["step"] = "confirm"
 
         d = context.user_data
-
-        profile_view = (
+        profile = (
             "Спасибо 🤍\n"
             "Вот как тебя увидят другие:\n\n"
-            f"{d['name']}\n\n"
+            f"{d['name']}\n"
             f"{d['looking']}\n\n"
             "Всё верно?"
         )
 
-        await update.message.reply_text(
-            profile_view,
-            reply_markup=confirm_kb()
-        )
+        await update.message.reply_text(profile, reply_markup=confirm_kb())
 
 
 # ================== ФОТО ==================
-async def handle_photo(update, context):
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
         return
 
@@ -212,22 +183,22 @@ async def handle_photo(update, context):
 
 
 # ================== СОХРАНЕНИЕ ==================
-async def save_profile(update, context):
+async def save_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     d = context.user_data
-    user_id = update.message.from_user.id
+    user_id = update.effective_user.id
 
     with conn.cursor() as c:
         c.execute("""
         INSERT INTO users (user_id, gender, name, age, city, looking, photo, last_seen)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (user_id) DO UPDATE SET
-            gender = EXCLUDED.gender,
-            name = EXCLUDED.name,
-            age = EXCLUDED.age,
-            city = EXCLUDED.city,
-            looking = EXCLUDED.looking,
-            photo = EXCLUDED.photo,
-            last_seen = NOW();
+            gender=EXCLUDED.gender,
+            name=EXCLUDED.name,
+            age=EXCLUDED.age,
+            city=EXCLUDED.city,
+            looking=EXCLUDED.looking,
+            photo=EXCLUDED.photo,
+            last_seen=EXCLUDED.last_seen;
         """, (
             user_id,
             d.get("gender"),
@@ -236,6 +207,7 @@ async def save_profile(update, context):
             d.get("city"),
             d.get("looking"),
             d.get("photo"),
+            datetime.utcnow()
         ))
 
     context.user_data.clear()
@@ -247,35 +219,34 @@ async def save_profile(update, context):
         "– смотреть анкеты других\n"
         "– находить близких по духу людей\n"
         "– общаться и знакомиться",
-        reply_markup=menu_after_profile()
+        reply_markup=main_menu_kb()
     )
 
 
 # ================== РОУТЕР ==================
-async def router(update, context):
+async def router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "Моя анкета":
-        await start_profile(update, context)
-
-    elif text == "Подтвердить":
+    if text == "Подтвердить":
         await save_profile(update, context)
 
     elif text == "Изменить":
         await start_profile(update, context)
 
+    elif text == "Моя анкета":
+        await start_profile(update, context)
+
     elif text == "Поиск людей":
         await update.message.reply_text(
-            "Ты в разделе поиска 🤍\n\n"
-            "Функция скоро будет доступна.",
-            reply_markup=menu_after_profile()
+            "Раздел поиска скоро будет доступен 🤍",
+            reply_markup=main_menu_kb()
         )
 
     else:
         await handle_text(update, context)
 
 
-# ================== MAIN ==================
+# ================== ЗАПУСК ==================
 def main():
     init_db()
 
