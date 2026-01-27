@@ -1,4 +1,5 @@
 import os
+import logging
 import psycopg2
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -9,6 +10,14 @@ from telegram.ext import (
     filters,
 )
 
+# ================= LOGGING =================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ================= ENV =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -62,6 +71,7 @@ browse_keyboard = ReplyKeyboardMarkup(
 
 # ================= START =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"/start user={update.effective_user.id}")
     context.user_data.clear()
     await update.message.reply_text(
         "💖 Добро пожаловать в «СвойЧеловек»",
@@ -70,6 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= CREATE PROFILE =================
 async def create_profile(update, context):
+    logger.info(f"CREATE_PROFILE user={update.effective_user.id}")
     context.user_data.clear()
     context.user_data["step"] = "gender"
     await update.message.reply_text("Ты парень или девушка?")
@@ -77,6 +88,7 @@ async def create_profile(update, context):
 async def handle_profile(update, context):
     step = context.user_data.get("step")
     text = update.message.text
+    logger.info(f"HANDLE_PROFILE user={update.effective_user.id} step={step} text={text}")
 
     if step == "gender":
         context.user_data["gender"] = text
@@ -111,8 +123,10 @@ async def handle_profile(update, context):
         await update.message.reply_text("Пришли одно фото 📸")
         return
 
-# ================= PHOTO (ПОКАЗ АНКЕТЫ) =================
+# ================= PHOTO =================
 async def handle_photo(update, context):
+    logger.info(f"HANDLE_PHOTO user={update.effective_user.id}")
+
     if context.user_data.get("step") != "photo":
         return
 
@@ -151,13 +165,7 @@ async def handle_photo(update, context):
         f"💬 {context.user_data['about']}"
     )
 
-    await update.message.reply_photo(
-        photo_id,
-        caption=text,
-        reply_markup=main_keyboard
-    )
-
-    # ОЧИЩАЕМ ТОЛЬКО ПОСЛЕ ПОКАЗА
+    await update.message.reply_photo(photo_id, caption=text, reply_markup=main_keyboard)
     context.user_data.clear()
 
 # ================= FILTER + SHOW =================
@@ -183,7 +191,6 @@ def get_random_profile(user_id, min_age, max_age):
         ORDER BY RANDOM()
         LIMIT 1
         """, (user_id, city[0], min_age, max_age, user_id))
-
         row = c.fetchone()
     conn.close()
     return row
@@ -205,20 +212,143 @@ async def show_profile(update, context):
         return
 
     context.user_data["current_profile"] = profile[0]
-    _, _, gender, age, city, looking, about, photo_id = profile
+    _, username, gender, age, city, looking, about, photo_id = profile
 
     text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
 
-    await update.message.reply_photo(photo_id, caption=text, reply_markup=browse_keyboard)
+    if photo_id:
+        await update.message.reply_photo(photo_id, caption=text, reply_markup=browse_keyboard)
+    else:
+        await update.message.reply_text(text, reply_markup=browse_keyboard)
+
+# ================= LIKE =================
+async def like_profile(update, context):
+    from_user = update.effective_user.id
+    to_user = context.user_data.get("current_profile")
+    if not to_user:
+        return
+
+    conn = get_connection()
+    with conn.cursor() as c:
+        c.execute(
+            "INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
+            (from_user, to_user)
+        )
+
+        c.execute("""
+        SELECT u.username
+        FROM likes l
+        JOIN users u ON u.user_id=l.from_user
+        WHERE l.from_user=%s AND l.to_user=%s
+        """, (to_user, from_user))
+
+        match = c.fetchone()
+        conn.commit()
+    conn.close()
+
+    if match and match[0]:
+        await update.message.reply_text(
+            f"💞 Взаимная симпатия!\n👉 https://t.me/{match[0]}"
+        )
+
+    await show_profile(update, context)
+
+# ================= MATCHES =================
+async def show_matches(update, context):
+    conn = get_connection()
+    with conn.cursor() as c:
+        c.execute("""
+        SELECT u.username
+        FROM likes a
+        JOIN likes b ON a.from_user=b.to_user AND a.to_user=b.from_user
+        JOIN users u ON u.user_id=a.to_user
+        WHERE a.from_user=%s
+        """, (update.effective_user.id,))
+        matches = c.fetchall()
+    conn.close()
+
+    if not matches:
+        await update.message.reply_text("Пока нет совпадений 💔")
+        return
+
+    text = "💞 Твои совпадения:\n\n"
+    for m in matches:
+        if m[0]:
+            text += f"👉 https://t.me/{m[0]}\n"
+
+    await update.message.reply_text(text)
+
+# ================= MY PROFILE =================
+async def my_profile(update, context):
+    conn = get_connection()
+    with conn.cursor() as c:
+        c.execute("""
+        SELECT gender, age, city, looking, about, photo_id
+        FROM users WHERE user_id=%s
+        """, (update.effective_user.id,))
+        p = c.fetchone()
+    conn.close()
+
+    if not p:
+        await update.message.reply_text("Анкета не найдена")
+        return
+
+    text = f"👤 {p[0]}, {p[1]}\n📍 {p[2]}\n🎯 {p[3]}\n\n💬 {p[4]}"
+
+    if p[5]:
+        await update.message.reply_photo(p[5], caption=text, reply_markup=main_keyboard)
+    else:
+        await update.message.reply_text(text, reply_markup=main_keyboard)
+
+# ================= ROUTER =================
+async def router(update, context):
+    text = update.message.text
+    logger.info(f"ROUTER user={update.effective_user.id} text={text} step={context.user_data.get('step')}")
+
+    if context.user_data.get("step") == "filter_min_age":
+        if text.isdigit():
+            context.user_data["min_age"] = int(text)
+            context.user_data["step"] = "filter_max_age"
+            await update.message.reply_text("Максимальный возраст?")
+        return
+
+    if context.user_data.get("step") == "filter_max_age":
+        if text.isdigit():
+            context.user_data["max_age"] = int(text)
+            context.user_data.pop("step")
+            await show_profile(update, context)
+        return
+
+    if text == "➕ Создать анкету":
+        await create_profile(update, context)
+    elif text == "🔍 Смотреть анкеты":
+        await show_profile(update, context)
+    elif text == "❤️ Лайк":
+        await like_profile(update, context)
+    elif text == "➡️ Пропустить":
+        await show_profile(update, context)
+    elif text == "👤 Моя анкета":
+        await my_profile(update, context)
+    elif text == "❤️ Совпадения":
+        await show_matches(update, context)
+    elif context.user_data.get("step"):
+        await handle_profile(update, context)
+
+# ================= ERRORS =================
+async def error_handler(update, context):
+    logger.error("UNHANDLED ERROR", exc_info=context.error)
 
 # ================= MAIN =================
 def main():
     init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_profile))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+    app.add_error_handler(error_handler)
+
+    logger.info("🚀 BOT STARTED")
     app.run_polling()
 
 if __name__ == "__main__":
