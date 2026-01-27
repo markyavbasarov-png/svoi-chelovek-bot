@@ -84,8 +84,14 @@ def confirm_kb():
 
 # ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    await update.message.reply_text(WELCOME_TEXT, reply_markup=menu_start())
+    context.user_data.clear()  # 🔥 обязательно
+
+    await update.message.reply_text(
+        "Привет 🤍\n\n"
+        "Я помогу тебе найти своего человека.\n"
+        "Давай начнём с анкеты 👇",
+        reply_markup=main_menu()
+    )
 
 
 # ================== СОЗДАНИЕ АНКЕТЫ ==================
@@ -259,15 +265,18 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # /start — ТОЛЬКО CommandHandler
+    # 1️⃣ /start — ВСЕГДА ПЕРВЫМ
     app.add_handler(CommandHandler("start", start))
 
-    # фото (ВАЖНО: раньше текста)
+    # 2️⃣ Фото
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    # весь обычный текст → router
+    # 3️⃣ ВЕСЬ обычный текст → router
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, router)
     )
 
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
