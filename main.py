@@ -194,8 +194,9 @@ async def save_profile(update, context):
         ))
 
     context.user_data.clear()
+
     await update.message.reply_text(
-        "Готово 🤍",
+        "Анкета сохранена 🤍\n\nЧто будем делать дальше?",
         reply_markup=menu_after_profile()
     )
 
