@@ -159,7 +159,7 @@ async def handle_photo(update, context):
 async def ask_looking(update):
     await update.message.reply_text(
         "Кого ты хочешь найти?\n\n"
-        "— хочу найти друзей\n"
+        "— Ищу друга\n"
         "— ищу поддержку\n"
         "— хочется общения\n"
         "— открыт(а) к отношениям"
@@ -224,9 +224,11 @@ async def show_my_profile(update, context):
     else:
         await update.message.reply_text(text)
 
-
-# ================== ROUTER ==================
+# ================= ROUTER =================
 async def router(update, context):
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text
 
     if text == "Создать анкету":
@@ -235,24 +237,35 @@ async def router(update, context):
     elif text == "Моя анкета":
         await show_my_profile(update, context)
 
-    elif text == "Подтвердить":
-        await save_profile(update, context)
+    elif text == "✏️ Редактировать анкету":
+        await edit_profile(update, context)
+
+    elif text == "Поиск людей":
+        await search_people(update, context)
+
+    elif text == "❌ Стоп":
+        context.user_data.clear()
+        await update.message.reply_text(
+            "Поиск остановлен 🤍",
+            reply_markup=menu_after_profile()
+        )
 
     else:
         await handle_text(update, context)
+        
+        # ================= MAIN =================
+        def main():
+            init_db()
 
+            app = ApplicationBuilder().token(TOKEN).build()
 
-# ================== MAIN ==================
-def main():
-    init_db()
-    app = ApplicationBuilder().token(TOKEN).build()
+            # /start
+            app.add_handler(CommandHandler("start", start))
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+            # фото (важно: раньше текста)
+            app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    app.run_polling()
+            # весь текст → router
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
-
-if __name__ == "__main__":
-    main()
+            app.run_polling()
