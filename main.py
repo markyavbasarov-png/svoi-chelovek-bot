@@ -111,7 +111,7 @@ async def handle_profile(update, context):
         await update.message.reply_text("Пришли одно фото 📸")
         return
 
-# ================= PHOTO (ПОКАЗ АНКЕТЫ ПОСЛЕ СОХРАНЕНИЯ) =================
+# ================= PHOTO (ПОКАЗ АНКЕТЫ СРАЗУ) =================
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
@@ -281,59 +281,4 @@ async def my_profile(update, context):
     conn.close()
 
     if not p:
-        await update.message.reply_text("Анкета не найдена")
-        return
-
-    text = f"👤 {p[0]}, {p[1]}\n📍 {p[2]}\n🎯 {p[3]}\n\n💬 {p[4]}"
-
-    if p[5]:
-        await update.message.reply_photo(p[5], caption=text, reply_markup=main_keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=main_keyboard)
-
-# ================= ROUTER =================
-async def router(update, context):
-    text = update.message.text
-
-    if context.user_data.get("step") == "filter_min_age":
-        if not text.isdigit():
-            return
-        context.user_data["min_age"] = int(text)
-        context.user_data["step"] = "filter_max_age"
-        await update.message.reply_text("Максимальный возраст?")
-        return
-
-    if context.user_data.get("step") == "filter_max_age":
-        if not text.isdigit():
-            return
-        context.user_data["max_age"] = int(text)
-        context.user_data.pop("step")
-        await show_profile(update, context)
-        return
-
-    if text == "➕ Создать анкету":
-        await create_profile(update, context)
-    elif text == "🔍 Смотреть анкеты":
-        await show_profile(update, context)
-    elif text == "❤️ Лайк":
-        await like_profile(update, context)
-    elif text == "➡️ Пропустить":
-        await show_profile(update, context)
-    elif text == "👤 Моя анкета":
-        await my_profile(update, context)
-    elif text == "❤️ Совпадения":
-        await show_matches(update, context)
-    elif context.user_data.get("step"):
-        await handle_profile(update, context)
-
-# ================= MAIN =================
-def main():
-    init_db()
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+        await update.message
