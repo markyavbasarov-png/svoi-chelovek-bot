@@ -84,16 +84,22 @@ def confirm_kb():
 
 # ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()  # 🔥 обязательно
+    context.user_data.clear()
 
-    
+    await update.message.reply_text(
+        WELCOME_TEXT,
+        reply_markup=menu_start()
+    )
 
 
 # ================== СОЗДАНИЕ АНКЕТЫ ==================
 async def start_profile(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
-    await update.message.reply_text("Выбери вариант 🤍", reply_markup=gender_kb())
+    await update.message.reply_text(
+        "Выбери вариант 🤍",
+        reply_markup=gender_kb()
+    )
 
 
 # ================== ТЕКСТ ==================
@@ -145,6 +151,12 @@ async def handle_text(update, context):
             reply_markup=confirm_kb()
         )
 
+    elif step == "confirm" and text == "Подтвердить":
+        await save_profile(update, context)
+
+    elif step == "confirm" and text == "Изменить":
+        await start_profile(update, context)
+
 
 # ================== ФОТО ==================
 async def handle_photo(update, context):
@@ -161,9 +173,9 @@ async def ask_looking(update):
     await update.message.reply_text(
         "Кого ты хочешь найти?\n\n"
         "— Ищу друга\n"
-        "— ищу поддержку\n"
-        "— хочется общения\n"
-        "— открыт(а) к отношениям"
+        "— Ищу поддержку\n"
+        "— Хочется общения\n"
+        "— Открыт(а) к отношениям"
     )
 
 
@@ -225,6 +237,7 @@ async def show_my_profile(update, context):
     else:
         await update.message.reply_text(text)
 
+
 # ================= ROUTER =================
 async def router(update, context):
     if not update.message or not update.message.text:
@@ -238,40 +251,22 @@ async def router(update, context):
     elif text == "Моя анкета":
         await show_my_profile(update, context)
 
-    elif text == "✏️ Редактировать анкету":
-        await edit_profile(update, context)
-
-    elif text == "Поиск людей":
-        await search_people(update, context)
-
-    elif text == "❌ Стоп":
-        context.user_data.clear()
-        await update.message.reply_text(
-            "Поиск остановлен 🤍",
-            reply_markup=menu_after_profile()
-        )
-
     else:
         await handle_text(update, context)
-        
- # ================= MAIN =================
+
+
+# ================= MAIN =================
 def main():
     init_db()
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # 1️⃣ /start — ВСЕГДА ПЕРВЫМ
     app.add_handler(CommandHandler("start", start))
-
-    # 2️⃣ Фото
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
-    # 3️⃣ ВЕСЬ обычный текст → router
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, router)
-    )
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
