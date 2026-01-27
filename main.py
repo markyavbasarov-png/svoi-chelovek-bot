@@ -312,16 +312,19 @@ async def edit_profile(update, context):
         reply_markup=gender_kb()
     )
 
-# ================== ПОИСК ЛЮДЕЙ ================== 
-async def router(update, context):
-    text = update.message.text
+# ================== ROUTER / ПОИСК ЛЮДЕЙ ================== 
+    async def router(update, context):
+    if not update.message or not update.message.text:
+        return
 
+    text = update.message.text
+    
     if text == "Моя анкета":
         await show_my_profile(update, context)
-    
+
     elif text == "Создать анкету":
-    await start_profile(update, context)
- 
+        await start_profile(update, context)
+
     elif text == "✏️ Редактировать анкету":
         await edit_profile(update, context)
 
@@ -331,7 +334,6 @@ async def router(update, context):
     elif text == "Изменить":
         await start_profile(update, context)
 
-    # ===== ПОИСК ЛЮДЕЙ =====
     elif text == "Поиск людей":
         user_id = update.message.from_user.id
 
