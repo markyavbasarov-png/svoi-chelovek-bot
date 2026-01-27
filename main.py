@@ -1,6 +1,10 @@
-import os
+ import os
 import psycopg2
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -34,38 +38,20 @@ def init_db():
         """)
 
 
-
-
-
-# ================== СТАРТ ==================
-WELCOME_TEXT = (
-    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
-    "Здесь можно найти не просто знакомство —\n"
-    "а друга, подругу, поддержку или любовь.\n\n"
-    "Это пространство для тех,\n"
-    "кто устал быть «сильным» в одиночку\n"
-    "и хочет, чтобы его поняли 🤍\n\n"
-    "Здесь не оценивают и не торопят.\n"
-    "Здесь принимают — такими, какие вы есть.\n\n"
-    "Давай начнём с анкеты ✨"
-)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        WELCOME_TEXT,
-        reply_markup=menu_start()
+# ================== КНОПКИ ==================
+def menu_start():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Моя анкета")]],
+        resize_keyboard=True
     )
 
-from telegram import ReplyKeyboardMarkup, KeyboardButton
-
-# ================== КНОПКИ ==================
 
 def gender_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
         resize_keyboard=True
     )
+
 
 def photo_kb():
     return ReplyKeyboardMarkup(
@@ -76,11 +62,13 @@ def photo_kb():
         resize_keyboard=True
     )
 
+
 def confirm_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Подтвердить"), KeyboardButton("Изменить")]],
         resize_keyboard=True
     )
+
 
 def menu_after_profile():
     return ReplyKeyboardMarkup(
@@ -88,8 +76,24 @@ def menu_after_profile():
         resize_keyboard=True
     )
 
-# ================== СТАРТ АНКЕТЫ ==================
 
+# ================== СТАРТ ==================
+WELCOME_TEXT = (
+    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
+    "Здесь можно найти не просто знакомство —\n"
+    "а друга, подругу, поддержку или любовь.\n\n"
+    "Давай начнём с анкеты ✨"
+)
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        WELCOME_TEXT,
+        reply_markup=menu_start()
+    )
+
+
+# ================== СТАРТ АНКЕТЫ ==================
 async def start_profile(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
@@ -99,8 +103,8 @@ async def start_profile(update, context):
         reply_markup=gender_kb()
     )
 
-# ================== ТЕКСТОВАЯ ЛОГИКА ==================
 
+# ================== ТЕКСТОВАЯ ЛОГИКА ==================
 async def handle_text(update, context):
     text = update.message.text
     step = context.user_data.get("step")
@@ -111,7 +115,7 @@ async def handle_text(update, context):
         context.user_data["step"] = "name"
 
         await update.message.reply_text(
-            "Как тебя зовут?\nМожно имя или ник — как тебе комфортно 🤍"
+            "Как тебя зовут?\nМожно имя или ник 🤍"
         )
 
     # ИМЯ
@@ -133,7 +137,7 @@ async def handle_text(update, context):
         context.user_data["step"] = "city"
 
         await update.message.reply_text(
-            "Откуда ты?\nГород или страна — как удобно 🤍"
+            "Откуда ты?\nГород или страна 🤍"
         )
 
     # ГОРОД
@@ -146,6 +150,12 @@ async def handle_text(update, context):
             "С фото людям проще понять, кто ты.\n"
             "Но это не обязательно 🤍",
             reply_markup=photo_kb()
+        )
+
+    # КНОПКА ЗАГРУЗИТЬ ФОТО
+    elif step == "photo" and text == "📸 Загрузить фото":
+        await update.message.reply_text(
+            "Хорошо 😊\nОтправь фото одним сообщением"
         )
 
     # ПРОПУСК ФОТО
@@ -181,8 +191,8 @@ async def handle_text(update, context):
             reply_markup=confirm_kb()
         )
 
-# ================== ФОТО ==================
 
+# ================== ФОТО ==================
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
@@ -200,10 +210,34 @@ async def handle_photo(update, context):
         "— открыт(а) к отношениям"
     )
 
-# ================== СОХРАНЕНИЕ ==================
 
+# ================== СОХРАНЕНИЕ ==================
 async def save_profile(update, context):
-    # здесь можешь сохранить в PostgreSQL
+    d = context.user_data
+    user_id = update.message.from_user.id
+
+    with conn.cursor() as c:
+        c.execute("""
+        INSERT INTO users (user_id, gender, name, age, city, looking, photo, last_seen)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+            gender = EXCLUDED.gender,
+            name = EXCLUDED.name,
+            age = EXCLUDED.age,
+            city = EXCLUDED.city,
+            looking = EXCLUDED.looking,
+            photo = EXCLUDED.photo,
+            last_seen = NOW();
+        """, (
+            user_id,
+            d.get("gender"),
+            d.get("name"),
+            d.get("age"),
+            d.get("city"),
+            d.get("looking"),
+            d.get("photo"),
+        ))
+
     context.user_data.clear()
 
     await update.message.reply_text(
@@ -216,8 +250,8 @@ async def save_profile(update, context):
         reply_markup=menu_after_profile()
     )
 
-# ================== РОУТЕР ==================
 
+# ================== РОУТЕР ==================
 async def router(update, context):
     text = update.message.text
 
@@ -239,3 +273,20 @@ async def router(update, context):
 
     else:
         await handle_text(update, context)
+
+
+# ================== MAIN ==================
+def main():
+    init_db()
+
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
