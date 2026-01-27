@@ -334,25 +334,25 @@ async def search_people(update, context):
 
     with conn.cursor() as c:
     if shown:
-            c.execute(
-                """
-                SELECT user_id, name, age, city, looking, photo
-                FROM users
-                WHERE user_id NOT IN %s
-                ORDER BY RANDOM()
-                LIMIT 1
-                """,
-                (tuple(shown),)
-            )
-        else:
-            c.execute(
-                """
-                SELECT user_id, name, age, city, looking, photo
-                FROM users
-                ORDER BY RANDOM()
-                LIMIT 1
-                """
-            )
+        c.execute(
+            """
+            SELECT user_id, name, age, city
+            FROM users
+            WHERE user_id NOT IN %s
+            ORDER BY RANDOM()
+            LIMIT 1
+            """,
+            (tuple(shown),)
+        )
+    else:
+        c.execute(
+            """
+            SELECT user_id, name, age, city
+            FROM users
+            ORDER BY RANDOM()
+            LIMIT 1
+            """
+        )
 
         row = c.fetchone()
 
