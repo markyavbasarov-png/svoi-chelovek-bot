@@ -53,12 +53,15 @@ WELCOME_TEXT = (
 
 
 # ================== КНОПКИ ==================
-def menu_start():
+def menu_after_profile():
     return ReplyKeyboardMarkup(
-        [[KeyboardButton("Моя анкета")]],
+        [
+            [KeyboardButton("Моя анкета")],
+            [KeyboardButton("✏️ Редактировать анкету")],
+            [KeyboardButton("Поиск людей")]
+        ],
         resize_keyboard=True
     )
-
 
 def gender_kb():
     return ReplyKeyboardMarkup(
@@ -66,13 +69,25 @@ def gender_kb():
         resize_keyboard=True
     )
 
+def photo_kb():
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("📸 Загрузить фото"), KeyboardButton("Пропустить")]],
+        resize_keyboard=True
+    )
 
 def confirm_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Подтвердить"), KeyboardButton("Изменить")]],
         resize_keyboard=True
     )
-
+def search_kb():
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("❤️ Дальше")],
+            [KeyboardButton("❌ Стоп")]
+        ],
+        resize_keyboard=True
+    )
 
 def menu_after_profile():
     return ReplyKeyboardMarkup(
@@ -226,27 +241,187 @@ async def save_profile(update, context):
         reply_markup=menu_after_profile()
     )
 
+# ================== МОЯ АНКЕТА ==================
+async def show_my_profile(update, context):
+    user_id = update.message.from_user.id
 
+    with conn.cursor() as c:
+        c.execute("""
+        SELECT name, age, city, looking, photo
+        FROM users
+        WHERE user_id = %s
+        """, (user_id,))
+        row = c.fetchone()
+
+    if not row:
+        await update.message.reply_text(
+            "У тебя ещё нет анкеты 🤍\n\nДавай создадим её?",
+            reply_markup=menu_start()
+        )
+        return
+
+    name, age, city, looking, photo = row
+
+    text = (
+        f"{name}\n"
+        f"{looking}\n\n"
+        f"📍 {city}\n"
+        f"🎂 {age} лет"
+    )
+
+    if photo:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=menu_after_profile()
+        )
+    else:
+        await update.message.reply_text(
+            text,
+            reply_markup=menu_after_profile()
+        )
+
+# ================== РЕДАКТИРОВАНИЕ ==================
+async def edit_profile(update, context):
+    user_id = update.message.from_user.id
+
+    with conn.cursor() as c:
+        c.execute("""
+        SELECT gender, name, age, city, looking, photo
+        FROM users
+        WHERE user_id = %s
+        """, (user_id,))
+        row = c.fetchone()
+
+    if not row:
+        await update.message.reply_text(
+            "Анкета не найдена 🤍\nДавай создадим её заново",
+            reply_markup=menu_start()
+        )
+        return
+
+    gender, name, age, city, looking, photo = row
+
+    # загружаем данные в user_data
+    context.user_data.clear()
+    context.user_data.update({
+        "gender": gender,
+        "name": name,
+        "age": age,
+        "city": city,
+        "looking": looking,
+        "photo": photo,
+        "step": "gender"
+    })
+
+    await update.message.reply_text(
+        "Давай обновим твою анкету 🤍\n\n"
+        "Начнём сначала.\n"
+        "Ты всегда можешь изменить ответы.",
+        reply_markup=gender_kb()
+    )
+
+# ================== ПОИСК ЛЮДЕЙ ==================
+async def search_people(update, context):
+    user_id = update.message.from_user.id
+
+    # берём список уже показанных
+    shown = context.user_data.get("shown_users", []).copy()
+
+    # чтобы не показать самого себя
+    if user_id not in shown:
+        shown.append(user_id)
+
+    with conn.cursor() as c:
+        if shown:
+            c.execute(
+                """
+                SELECT user_id, name, age, city, looking, photo
+                FROM users
+                WHERE user_id NOT IN %s
+                ORDER BY RANDOM()
+                LIMIT 1
+                """,
+                (tuple(shown),)
+            )
+        else:
+            c.execute(
+                """
+                SELECT user_id, name, age, city, looking, photo
+                FROM users
+                ORDER BY RANDOM()
+                LIMIT 1
+                """
+            )
+
+        row = c.fetchone()
+
+    # если анкеты закончились
+    if not row:
+        context.user_data["shown_users"] = []
+        await update.message.reply_text(
+            "Пока больше никого нет 🤍\nЗагляни позже",
+            reply_markup=menu_after_profile()
+        )
+        return
+
+    other_id, name, age, city, looking, photo = row
+
+    # сохраняем, что этот пользователь уже показан
+    shown.append(other_id)
+    context.user_data["shown_users"] = shown
+
+    text = (
+        f"{name}\n"
+        f"{looking}\n\n"
+        f"📍 {city}\n"
+        f"🎂 {age} лет"
+    )
+
+    if photo:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=search_kb()
+        )
+    else:
+        await update.message.reply_text(
+            text,
+            reply_markup=search_kb()
+        )
+        
 # ================== РОУТЕР ==================
 async def router(update, context):
     text = update.message.text
 
     if text == "Моя анкета":
-        await start_profile(update, context)
+        await show_my_profile(update, context)
 
-    elif text == "Подтвердить":
+    elif text == "✏️ Редактировать анкету":
+        await edit_profile(update, context)
+
+    elif text == "Подтвердить" and context.user_data.get("step") == "confirm":
         await save_profile(update, context)
 
     elif text == "Изменить":
         await start_profile(update, context)
 
+    # ===== ПОИСК ЛЮДЕЙ =====
     elif text == "Поиск людей":
+        context.user_data["shown_users"] = []
+        await search_people(update, context)
+
+    elif text == "❤️ Дальше":
+        await search_people(update, context)
+
+    elif text == "❌ Стоп":
+        context.user_data.clear()
         await update.message.reply_text(
-            "Ты в разделе поиска 🤍\n\n"
-            "Функция скоро будет доступна.",
+            "Поиск остановлен 🤍",
             reply_markup=menu_after_profile()
         )
 
+    # ===== ВСЁ ОСТАЛЬНОЕ =====
     else:
         await handle_text(update, context)
 
