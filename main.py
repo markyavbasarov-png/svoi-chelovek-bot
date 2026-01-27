@@ -367,18 +367,18 @@ async def router(update, context):
     else:
         await handle_text(update, context)
 
-
-# ================== MAIN ==================
+# ================= MAIN =================
 def main():
     init_db()
 
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
     app.run_polling()
 
-    if __name__ == "__main__":
+
+if __name__ == "__main__":
     main()
+
