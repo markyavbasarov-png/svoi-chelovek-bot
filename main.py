@@ -333,7 +333,7 @@ async def search_people(update, context):
         shown.append(user_id)
 
     with conn.cursor() as c:
-        if shown:
+    if shown:
             c.execute(
                 """
                 SELECT user_id, name, age, city, looking, photo
@@ -434,7 +434,7 @@ async def router(update, context):
             )
             exists = c.fetchone()
 
-        if not exists:
+    if not exists:
             await update.message.reply_text(
                 "Сначала нужно заполнить анкету 🤍"
             )
@@ -474,6 +474,5 @@ def main():
 
     app.run_polling()
 
-
-if __name__ == "__main__":
+    if __name__ == "__main__":
     main()
