@@ -407,19 +407,35 @@ async def router(update, context):
         await start_profile(update, context)
 
     # ===== ПОИСК ЛЮДЕЙ =====
-    elif text == "Поиск людей":
-        context.user_data["shown_users"] = []
-        await search_people(update, context)
+ elif text == "Поиск людей":
+    user_id = update.message.from_user.id
 
-    elif text == "❤️ Дальше":
-        await search_people(update, context)
-
-    elif text == "❌ Стоп":
-        context.user_data.clear()
-        await update.message.reply_text(
-            "Поиск остановлен 🤍",
-            reply_markup=menu_after_profile()
+    with conn.cursor() as c:
+        c.execute(
+            "SELECT 1 FROM users WHERE user_id = %s",
+            (user_id,)
         )
+        exists = c.fetchone()
+
+    if not exists:
+        await update.message.reply_text(
+            "Сначала нужно заполнить анкету 🤍"
+        )
+        await start_profile(update, context)
+        return
+
+    context.user_data["shown_users"] = []
+    await search_people(update, context)
+
+elif text == "❤️ Дальше":
+    await search_people(update, context)
+
+elif text == "❌ Стоп":
+    context.user_data.clear()
+    await update.message.reply_text(
+        "Поиск остановлен 🤍",
+        reply_markup=menu_after_profile()
+    )
 
     # ===== ВСЁ ОСТАЛЬНОЕ =====
     else:
