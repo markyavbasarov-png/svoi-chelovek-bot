@@ -283,7 +283,7 @@ async def show_my_profile(update, context):
 
 # ================== РЕДАКТИРОВАНИЕ ==================
 async def edit_profile(update, context):
-    user_id = update.message.from_user.id
+    user_id = update.message.from_user.idе
 
     with conn.cursor() as c:
         c.execute("""
@@ -321,74 +321,59 @@ async def edit_profile(update, context):
         reply_markup=gender_kb()
     )
 
-# ================== ПОИСК ЛЮДЕЙ ==================
+# ================== ПОИСК ЛЮДЕЙ ================== 
 async def search_people(update, context):
     user_id = update.message.from_user.id
 
-    # берём список уже показанных
-    shown = context.user_data.get("shown_users", []).copy()
+    # список уже показанных
+    shown = context.user_data.get("shown_users", [])
 
-    # чтобы не показать самого себя
+    # не показываем самого себя
     if user_id not in shown:
         shown.append(user_id)
 
+    context.user_data["shown_users"] = shown
+
     with conn.cursor() as c:
-    if shown:
-        c.execute(
-            """
-            SELECT user_id, name, age, city
-            FROM users
-            WHERE user_id NOT IN %s
-            ORDER BY RANDOM()
-            LIMIT 1
-            """,
-            (tuple(shown),)
-        )
-    else:
-        c.execute(
-            """
-            SELECT user_id, name, age, city
-            FROM users
-            ORDER BY RANDOM()
-            LIMIT 1
-            """
-        )
+        if shown:
+            c.execute(
+                """
+                SELECT user_id, name, age, city
+                FROM users
+                WHERE user_id NOT IN %s
+                ORDER BY RANDOM()
+                LIMIT 1
+                """,
+                (tuple(shown),)
+            )
+        else:
+            c.execute(
+                """
+                SELECT user_id, name, age, city
+                FROM users
+                ORDER BY RANDOM()
+                LIMIT 1
+                """
+            )
 
-        row = c.fetchone()
+        person = c.fetchone()
 
-    # если анкеты закончились
-    if not row:
-        context.user_data["shown_users"] = []
+    if not person:
         await update.message.reply_text(
-            "Пока больше никого нет 🤍\nЗагляни позже",
+            "Пока больше никого нет 🤍",
             reply_markup=menu_after_profile()
         )
         return
 
-    other_id, name, age, city, looking, photo = row
-
-    # сохраняем, что этот пользователь уже показан
+    other_id, name, age, city = person
     shown.append(other_id)
     context.user_data["shown_users"] = shown
 
-    text = (
-        f"{name}\n"
-        f"{looking}\n\n"
-        f"📍 {city}\n"
-        f"🎂 {age} лет"
+    await update.message.reply_text(
+        f"💞 {name}, {age}\n🏙 {city}",
+        reply_markup=search_kb()
     )
 
-    if photo:
-        await update.message.reply_photo(
-            photo=photo,
-            caption=text,
-            reply_markup=search_kb()
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            reply_markup=search_kb()
-        )
         
 # ================== РОУТЕР ==================
 async def router(update, context):
