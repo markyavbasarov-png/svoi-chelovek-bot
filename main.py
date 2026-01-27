@@ -23,8 +23,11 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not BOT_TOKEN or not DATABASE_URL:
-    raise RuntimeError("BOT_TOKEN или DATABASE_URL не заданы")
+if not BOT_TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не задан")
+
+if not DATABASE_URL:
+    raise RuntimeError("❌ DATABASE_URL не задан")
 
 # ================= DB =================
 def get_connection():
@@ -35,30 +38,34 @@ def get_connection():
     )
 
 def init_db():
-    conn = get_connection()
-    with conn.cursor() as c:
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            username TEXT,
-            gender TEXT,
-            age INT,
-            city TEXT,
-            looking TEXT,
-            about TEXT,
-            photo_id TEXT
-        );
-        """)
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS likes (
-            from_user BIGINT,
-            to_user BIGINT,
-            UNIQUE(from_user, to_user)
-        );
-        """)
-        conn.commit()
-    conn.close()
-    logger.info("DB initialized")
+    try:
+        conn = get_connection()
+        with conn.cursor() as c:
+            c.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                username TEXT,
+                gender TEXT,
+                age INT,
+                city TEXT,
+                looking TEXT,
+                about TEXT,
+                photo_id TEXT
+            );
+            """)
+            c.execute("""
+            CREATE TABLE IF NOT EXISTS likes (
+                from_user BIGINT,
+                to_user BIGINT,
+                UNIQUE(from_user, to_user)
+            );
+            """)
+            conn.commit()
+        conn.close()
+        logger.info("✅ DB initialized")
+    except Exception:
+        logger.exception("❌ Ошибка инициализации БД")
+        raise
 
 # ================= KEYBOARDS =================
 main_keyboard = ReplyKeyboardMarkup(
@@ -66,7 +73,7 @@ main_keyboard = ReplyKeyboardMarkup(
         ["🔍 Смотреть анкеты"],
         ["❤️ Совпадения"],
         ["👤 Моя анкета"],
-        ["➕ Создать анкету"],
+        ["➕ Создать анкету"]
     ],
     resize_keyboard=True
 )
@@ -74,6 +81,7 @@ main_keyboard = ReplyKeyboardMarkup(
 # ================= START =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
+    logger.info(f"/start by {update.effective_user.id}")
     await update.message.reply_text(
         "💖 Добро пожаловать в «СвойЧеловек»",
         reply_markup=main_keyboard
@@ -81,6 +89,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= CREATE PROFILE =================
 async def create_profile(update, context):
+    logger.info(f"Создание анкеты: {update.effective_user.id}")
     context.user_data.clear()
     context.user_data["step"] = "gender"
     await update.message.reply_text("Ты парень или девушка?")
@@ -128,33 +137,27 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # PHOTO или DOCUMENT
-        if update.message.photo:
-            photo_id = update.message.photo[-1].file_id
-        elif update.message.document and update.message.document.mime_type.startswith("image/"):
-            photo_id = update.message.document.file_id
-        else:
-            await update.message.reply_text("Пожалуйста, пришли изображение")
-            return
-
+        photo_id = update.message.photo[-1].file_id
         data = context.user_data
+        user = update.effective_user
 
         conn = get_connection()
         with conn.cursor() as c:
             c.execute("""
-            INSERT INTO users (user_id, username, gender, age, city, looking, about, photo_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (user_id) DO UPDATE SET
-                username=EXCLUDED.username,
-                gender=EXCLUDED.gender,
-                age=EXCLUDED.age,
-                city=EXCLUDED.city,
-                looking=EXCLUDED.looking,
-                about=EXCLUDED.about,
-                photo_id=EXCLUDED.photo_id
+                INSERT INTO users (
+                    user_id, username, gender, age, city, looking, about, photo_id
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    username = EXCLUDED.username,
+                    gender = EXCLUDED.gender,
+                    age = EXCLUDED.age,
+                    city = EXCLUDED.city,
+                    looking = EXCLUDED.looking,
+                    about = EXCLUDED.about,
+                    photo_id = EXCLUDED.photo_id
             """, (
-                update.effective_user.id,
-                update.effective_user.username,
+                user.id,
+                user.username,
                 data["gender"],
                 data["age"],
                 data["city"],
@@ -165,7 +168,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
         conn.close()
 
-        text = (
+        caption = (
             f"👤 {data['gender']}, {data['age']}\n"
             f"📍 {data['city']}\n"
             f"🎯 {data['looking']}\n\n"
@@ -173,62 +176,32 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_photo(
-            photo_id,
-            caption=text,
+            photo=photo_id,
+            caption=caption,
             reply_markup=main_keyboard
         )
 
         context.user_data.clear()
-        logger.info("Profile saved successfully")
+        logger.info(f"✅ Анкета сохранена: {user.id}")
 
     except Exception:
-        logger.exception("Ошибка при сохранении анкеты")
+        logger.exception("❌ Ошибка при сохранении анкеты")
         await update.message.reply_text(
-            "❌ Ошибка при сохранении анкеты. Попробуй ещё раз.",
+            "❌ Ошибка при сохранении анкеты.\nНажми «Создать анкету» и попробуй ещё раз.",
             reply_markup=main_keyboard
         )
         context.user_data.clear()
 
-# ================= MY PROFILE =================
-async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = get_connection()
-    with conn.cursor() as c:
-        c.execute("SELECT * FROM users WHERE user_id=%s", (update.effective_user.id,))
-        user = c.fetchone()
-    conn.close()
-
-    if not user:
-        await update.message.reply_text(
-            "У тебя ещё нет анкеты",
-            reply_markup=main_keyboard
-        )
-        return
-
-    text = (
-        f"👤 {user['gender']}, {user['age']}\n"
-        f"📍 {user['city']}\n"
-        f"🎯 {user['looking']}\n\n"
-        f"💬 {user['about']}"
-    )
-
-    await update.message.reply_photo(
-        user["photo_id"],
-        caption=text,
-        reply_markup=main_keyboard
-    )
-
 # ================= ROUTER =================
-async def router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def router(update, context):
     text = update.message.text
 
     if text == "➕ Создать анкету":
         await create_profile(update, context)
-    elif text == "👤 Моя анкета":
-        await my_profile(update, context)
-    elif text in ("🔍 Смотреть анкеты", "❤️ Совпадения"):
-        await update.message.reply_text("🔧 В разработке", reply_markup=main_keyboard)
     elif context.user_data.get("step"):
         await handle_profile(update, context)
+    else:
+        await update.message.reply_text("Выбери действие ⬇️", reply_markup=main_keyboard)
 
 # ================= MAIN =================
 def main():
@@ -237,11 +210,11 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_photo))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
-    logger.info("Bot started")
-    app.run_polling(drop_pending_updates=True)
+    logger.info("🚀 Бот запущен")
+    app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     main()
