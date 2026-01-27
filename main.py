@@ -313,12 +313,12 @@ async def edit_profile(update, context):
     )
 
 # ================== ROUTER / ПОИСК ЛЮДЕЙ ================== 
-    async def router(update, context):
+async def router(update, context):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text
-    
+
     if text == "Моя анкета":
         await show_my_profile(update, context)
 
@@ -364,7 +364,6 @@ async def edit_profile(update, context):
             reply_markup=menu_after_profile()
         )
 
-    # ===== ВСЁ ОСТАЛЬНОЕ =====
     else:
         await handle_text(update, context)
 
