@@ -85,13 +85,42 @@ def update_last_seen(user_id):
         )
 
 # ================== START ==================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def save_profile(update, context):
+    d = context.user_data
     user_id = update.message.from_user.id
 
     with conn.cursor() as c:
-        c.execute("SELECT last_seen FROM users WHERE user_id=%s", (user_id,))
-        row = c.fetchone()
+        c.execute("""
+        INSERT INTO users (
+            user_id, gender, name, age, city, looking, photo, last_seen
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+            gender = EXCLUDED.gender,
+            name = EXCLUDED.name,
+            age = EXCLUDED.age,
+            city = EXCLUDED.city,
+            looking = EXCLUDED.looking,
+            photo = EXCLUDED.photo,
+            last_seen = NOW()
+        """, (
+            user_id,
+            d["gender"],
+            d["name"],
+            d["age"],
+            d["city"],
+            d["looking"],
+            d.get("photo")  # <-- ВАЖНО
+        )
 
+    context.user_data.clear()
+
+    await update.message.reply_text(
+        "Готово 🤍 Твоя анкета сохранена.",
+        reply_markup=menu_after_profile()
+    )
+
+    
     if row and row[0]:
         if (update.message.date - row[0]) > timedelta(days=7):
             await update.message.reply_text(
