@@ -80,7 +80,7 @@ def gender_kb():
 def photo_kb():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("📸 Загрузить фото"), KeyboardButton("Пропустить")]],
-        resize_keyboard=True
+        resize_keyboard=True 
     )
 
 
@@ -155,23 +155,7 @@ async def handle_text(update, context):
             "— открыт(а) к отношениям"
         )
 
-    elif step == "looking":
-        context.user_data["looking"] = text
-        context.user_data["step"] = "confirm"
-
-        d = context.user_data
-        profile_view = (
-            "Спасибо 🤍\n"
-            "Вот как тебя увидят другие:\n\n"
-            f"{d['name']}\n"
-            f"{d['looking']}\n\n"
-            "Всё верно?"
-        )
-
-        await update.message.reply_text(
-            profile_view,
-            reply_markup=confirm_kb()
-        )
+    
 
 
 # ================== ФОТО ==================
@@ -191,7 +175,25 @@ async def handle_photo(update, context):
         "— хочется общения\n"
         "— открыт(а) к отношениям"
     )
+elif step == "looking":
+    context.user_data["looking"] = text
+    context.user_data["step"] = "confirm"
 
+    d = context.user_data
+
+    profile_view = (
+        "Спасибо 🤍\n"
+        "Вот как тебя увидят другие:\n\n"
+        f"👤 {d['name']}, {d['age']} лет\n"
+        f"📍 {d['city']}\n"
+        f"🎯 {d['looking']}\n\n"
+        "Всё верно?"
+    )
+
+    await update.message.reply_text(
+        profile_view,
+        reply_markup=confirm_kb()
+    )
 
 # ================== СОХРАНЕНИЕ ==================
 async def save_profile(update, context):
@@ -222,15 +224,10 @@ async def save_profile(update, context):
 
     context.user_data.clear()
 
-    await update.message.reply_text(
-        "Готово 🤍\n"
-        "Твоя анкета сохранена.\n\n"
-        "Теперь ты можешь:\n"
-        "– смотреть анкеты других\n"
-        "– находить близких по духу людей\n"
-        "– общаться и знакомиться",
-        reply_markup=menu_after_profile()
-    )
+await update.message.reply_text(
+    "Готово 🤍\nХочешь посмотреть анкеты?",
+    reply_markup=after_confirm_kb()
+)
 
 # ================== МОЯ АНКЕТА ==================
 async def show_my_profile(update, context):
@@ -332,7 +329,10 @@ async def router(update, context):
         await save_profile(update, context)
 
     elif text == "Изменить":
-        await start_profile(update, context)
+        await start_profile(update, context)        
+        
+    elif text == "🔍 Смотреть анкеты":
+         await start_search(update, context)
 
     elif text == "Поиск людей":
         user_id = update.message.from_user.id
