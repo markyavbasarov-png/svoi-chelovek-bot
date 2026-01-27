@@ -211,7 +211,10 @@ async def like_profile(update, context):
 
     conn = get_connection()
     with conn.cursor() as c:
-        c.execute("INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING", (from_user, to_user))
+        c.execute(
+            "INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
+            (from_user, to_user)
+        )
 
         c.execute("""
         SELECT u.username
@@ -230,16 +233,16 @@ async def like_profile(update, context):
 
     await show_profile(update, context)
 
-# ================= MATCHES =================
+# ================= MATCHES (FIXED VARIANT 2) =================
 async def show_matches(update, context):
     conn = get_connection()
     with conn.cursor() as c:
         c.execute("""
         SELECT u.username
-        FROM likes l1
-        JOIN likes l2 ON l1.from_user=l2.to_user AND l1.to_user=l2.from_user
-        JOIN users u ON u.user_id=l1.to_user
-        WHERE l1.from_user=%s
+        FROM likes a
+        JOIN likes b ON a.from_user = b.to_user AND a.to_user = b.from_user
+        JOIN users u ON u.user_id = a.to_user
+        WHERE a.from_user = %s
         """, (update.effective_user.id,))
         matches = c.fetchall()
     conn.close()
