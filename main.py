@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not BOT_TOKEN or not DATABASE_URL:
+    raise RuntimeError("❌ BOT_TOKEN или DATABASE_URL не заданы")
+
 # ================= DB =================
 def get_connection():
     return psycopg2.connect(DATABASE_URL, sslmode="require")
@@ -49,7 +52,7 @@ def init_db():
         """)
         conn.commit()
     conn.close()
-    logger.info("DB initialized")
+    logger.info("✅ DB initialized")
 
 # ================= KEYBOARDS =================
 main_keyboard = ReplyKeyboardMarkup(
@@ -57,17 +60,9 @@ main_keyboard = ReplyKeyboardMarkup(
         ["🔍 Смотреть анкеты"],
         ["❤️ Совпадения"],
         ["👤 Моя анкета"],
-        ["➕ Создать анкету"]
+        ["➕ Создать анкету"],
     ],
-    resize_keyboard=True
-)
-
-browse_keyboard = ReplyKeyboardMarkup(
-    [
-        ["❤️ Лайк", "➡️ Пропустить"],
-        ["👤 Моя анкета"]
-    ],
-    resize_keyboard=True
+    resize_keyboard=True,
 )
 
 # ================= START =================
@@ -76,45 +71,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/start by {update.effective_user.id}")
     await update.message.reply_text(
         "💖 Добро пожаловать в «СвойЧеловек»",
-        reply_markup=main_keyboard
+        reply_markup=main_keyboard,
     )
 
 # ================= CREATE PROFILE =================
-async def create_profile(update, context):
+async def create_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Create profile by {update.effective_user.id}")
     context.user_data.clear()
     context.user_data["step"] = "gender"
     await update.message.reply_text("Ты парень или девушка?")
 
-async def handle_profile(update, context):
+async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step")
     text = update.message.text
 
     if step == "gender":
         context.user_data["gender"] = text
         context.user_data["step"] = "age"
-        await update.message.reply_text("Возраст?")
+        await update.message.reply_text("Сколько тебе лет?")
         return
 
     if step == "age":
         if not text.isdigit():
-            await update.message.reply_text("Введите число")
+            await update.message.reply_text("❗ Введи возраст числом")
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-        await update.message.reply_text("Город?")
+        await update.message.reply_text("Из какого ты города?")
         return
 
     if step == "city":
         context.user_data["city"] = text
         context.user_data["step"] = "looking"
-        await update.message.reply_text("Кого ищешь?")
+        await update.message.reply_text("Кого ты ищешь?")
         return
 
     if step == "looking":
         context.user_data["looking"] = text
         context.user_data["step"] = "about"
-        await update.message.reply_text("О себе")
+        await update.message.reply_text("Напиши пару слов о себе")
         return
 
     if step == "about":
@@ -124,14 +119,13 @@ async def handle_profile(update, context):
         return
 
 # ================= PHOTO =================
-async def handle_photo(update, context):
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
-        logger.warning("Photo received вне шага анкеты")
+        logger.warning("Фото получено вне сценария анкеты")
         return
 
     try:
         photo_id = update.message.photo[-1].file_id
-
         data = context.user_data
 
         conn = get_connection()
@@ -150,65 +144,77 @@ async def handle_photo(update, context):
             """, (
                 update.effective_user.id,
                 update.effective_user.username,
-                data.get("gender"),
-                data.get("age"),
-                data.get("city"),
-                data.get("looking"),
-                data.get("about"),
-                photo_id
+                data["gender"],
+                data["age"],
+                data["city"],
+                data["looking"],
+                data["about"],
+                photo_id,
             ))
             conn.commit()
         conn.close()
 
-        text = (
-            f"👤 {data.get('gender')}, {data.get('age')}\n"
-            f"📍 {data.get('city')}\n"
-            f"🎯 {data.get('looking')}\n\n"
-            f"💬 {data.get('about')}"
+        caption = (
+            f"👤 {data['gender']}, {data['age']}\n"
+            f"📍 {data['city']}\n"
+            f"🎯 {data['looking']}\n\n"
+            f"💬 {data['about']}"
         )
 
         await update.message.reply_photo(
             photo_id,
-            caption=text,
-            reply_markup=main_keyboard
+            caption=caption,
+            reply_markup=main_keyboard,
         )
 
         context.user_data.clear()
-        logger.info("Profile saved successfully")
+        logger.info("✅ Profile saved")
 
-    except Exception as e:
-        logger.exception("Ошибка при сохранении анкеты")
+    except Exception:
+        logger.exception("❌ Ошибка сохранения анкеты")
+        context.user_data.clear()
         await update.message.reply_text(
-            "❌ Ошибка при сохранении анкеты. Нажми «Создать анкету» и попробуй снова.",
-            reply_markup=main_keyboard
+            "Произошла ошибка 😢 Попробуй создать анкету заново",
+            reply_markup=main_keyboard,
         )
-        context.user_data.clear()
 
-# ================= ROUTER =================
-async def router(update, context):
+# ================= ROUTERS =================
+async def profile_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("step"):
+        await handle_profile(update, context)
+
+async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "➕ Создать анкету":
         await create_profile(update, context)
-    elif text == "🔍 Смотреть анкеты":
-        await update.message.reply_text("🔧 Раздел в разработке", reply_markup=main_keyboard)
-    elif text == "👤 Моя анкета":
-        await update.message.reply_text("🔧 Раздел в разработке", reply_markup=main_keyboard)
-    elif text == "❤️ Совпадения":
-        await update.message.reply_text("🔧 Раздел в разработке", reply_markup=main_keyboard)
-    elif context.user_data.get("step"):
-        await handle_profile(update, context)
+        return
+
+    if text in ("🔍 Смотреть анкеты", "👤 Моя анкета", "❤️ Совпадения"):
+        await update.message.reply_text(
+            "🔧 Раздел в разработке",
+            reply_markup=main_keyboard,
+        )
+        return
+
+    if not context.user_data.get("step"):
+        await update.message.reply_text(
+            "Я тебя не понял 🤔 Используй кнопки меню 👇",
+            reply_markup=main_keyboard,
+        )
 
 # ================= MAIN =================
 def main():
     init_db()
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, profile_router))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router))
 
-    logger.info("Bot started")
+    logger.info("🚀 Bot started")
     app.run_polling()
 
 if __name__ == "__main__":
