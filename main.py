@@ -9,11 +9,14 @@ from telegram.ext import (
     filters,
 )
 
-# ================== НАСТРОЙКИ ==================
+# ========= НАСТРОЙКИ =========
 TOKEN = os.getenv("BOT_TOKEN")
 DB_URL = os.getenv("DATABASE_URL")
 
-conn = psycopg2.connect(DB_URL)
+conn = psycopg2.connect(
+    DB_URL,
+    sslmode="require"
+)
 conn.autocommit = True
 
 
