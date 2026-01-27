@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -111,7 +111,7 @@ async def handle_profile(update, context):
         await update.message.reply_text("Пришли одно фото 📸")
         return
 
-# ================= PHOTO =================
+# ================= PHOTO (ПОКАЗ АНКЕТЫ ПОСЛЕ СОХРАНЕНИЯ) =================
 async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
@@ -144,8 +144,20 @@ async def handle_photo(update, context):
         conn.commit()
     conn.close()
 
+    text = (
+        f"👤 {context.user_data['gender']}, {context.user_data['age']}\n"
+        f"📍 {context.user_data['city']}\n"
+        f"🎯 {context.user_data['looking']}\n\n"
+        f"💬 {context.user_data['about']}"
+    )
+
+    await update.message.reply_photo(
+        photo_id,
+        caption=text,
+        reply_markup=main_keyboard
+    )
+
     context.user_data.clear()
-    await update.message.reply_text("💖 Анкета сохранена!", reply_markup=main_keyboard)
 
 # ================= FILTER + SHOW =================
 def get_random_profile(user_id, min_age, max_age):
@@ -205,7 +217,6 @@ async def show_profile(update, context):
 async def like_profile(update, context):
     from_user = update.effective_user.id
     to_user = context.user_data.get("current_profile")
-
     if not to_user:
         return
 
@@ -233,16 +244,16 @@ async def like_profile(update, context):
 
     await show_profile(update, context)
 
-# ================= MATCHES (FIXED VARIANT 2) =================
+# ================= MATCHES =================
 async def show_matches(update, context):
     conn = get_connection()
     with conn.cursor() as c:
         c.execute("""
         SELECT u.username
         FROM likes a
-        JOIN likes b ON a.from_user = b.to_user AND a.to_user = b.from_user
-        JOIN users u ON u.user_id = a.to_user
-        WHERE a.from_user = %s
+        JOIN likes b ON a.from_user=b.to_user AND a.to_user=b.from_user
+        JOIN users u ON u.user_id=a.to_user
+        WHERE a.from_user=%s
         """, (update.effective_user.id,))
         matches = c.fetchall()
     conn.close()
@@ -285,12 +296,16 @@ async def router(update, context):
     text = update.message.text
 
     if context.user_data.get("step") == "filter_min_age":
+        if not text.isdigit():
+            return
         context.user_data["min_age"] = int(text)
         context.user_data["step"] = "filter_max_age"
         await update.message.reply_text("Максимальный возраст?")
         return
 
     if context.user_data.get("step") == "filter_max_age":
+        if not text.isdigit():
+            return
         context.user_data["max_age"] = int(text)
         context.user_data.pop("step")
         await show_profile(update, context)
