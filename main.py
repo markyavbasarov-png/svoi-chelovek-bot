@@ -1,18 +1,16 @@
 import os
 import psycopg2
-from datetime import datetime
-
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
-    KeyboardButton
+    KeyboardButton,
 )
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 # ================== НАСТРОЙКИ ==================
@@ -35,25 +33,36 @@ def init_db():
             city TEXT,
             looking TEXT,
             photo TEXT,
-            last_seen TIMESTAMP
+            last_seen TIMESTAMP DEFAULT NOW()
         );
         """)
 
 
+# ================== ТЕКСТ СТАРТА ==================
+WELCOME_TEXT = (
+    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
+    "Здесь можно найти не просто знакомство —\n"
+    "а друга, подругу, поддержку или любовь.\n\n"
+    "Это пространство для тех,\n"
+    "кто устал быть «сильным» в одиночку\n"
+    "и хочет, чтобы его поняли 🤍\n\n"
+    "Здесь не оценивают и не торопят.\n"
+    "Здесь принимают — такими, какие вы есть.\n\n"
+    "Давай начнём с анкеты ✨"
+)
+
+
 # ================== КНОПКИ ==================
-def gender_kb():
+def menu_start():
     return ReplyKeyboardMarkup(
-        [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
+        [[KeyboardButton("Моя анкета")]],
         resize_keyboard=True
     )
 
 
-def photo_kb():
+def gender_kb():
     return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("📸 Загрузить фото")],
-            [KeyboardButton("Пропустить")]
-        ],
+        [[KeyboardButton("Парень"), KeyboardButton("Девушка")]],
         resize_keyboard=True
     )
 
@@ -65,30 +74,24 @@ def confirm_kb():
     )
 
 
-def main_menu_kb():
+def menu_after_profile():
     return ReplyKeyboardMarkup(
         [[KeyboardButton("Моя анкета"), KeyboardButton("Поиск людей")]],
         resize_keyboard=True
     )
 
 
-# ================== СТАРТ ==================
-WELCOME_TEXT = (
-    "💗 Добро пожаловать в «СвойЧеловек»\n\n"
-    "Здесь можно найти не просто знакомство —\n"
-    "а друга, поддержку или любовь 🤍\n\n"
-    "Давай начнём с анкеты ✨"
-)
-
-
+# ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text(WELCOME_TEXT)
-    await start_profile(update, context)
+    await update.message.reply_text(
+        WELCOME_TEXT,
+        reply_markup=menu_start()
+    )
 
 
-# ================== АНКЕТА ==================
-async def start_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================== СОЗДАНИЕ АНКЕТЫ ==================
+async def start_profile(update, context):
     context.user_data.clear()
     context.user_data["step"] = "gender"
 
@@ -98,32 +101,33 @@ async def start_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================== ТЕКСТОВАЯ ЛОГИКА ==================
+async def handle_text(update, context):
     text = update.message.text
     step = context.user_data.get("step")
 
-    # ПОЛ
     if step == "gender" and text in ["Парень", "Девушка"]:
         context.user_data["gender"] = text
         context.user_data["step"] = "name"
-        await update.message.reply_text("Как тебя зовут? 🤍")
+        await update.message.reply_text(
+            "Как тебя зовут?🤍"
+        )
 
-    # ИМЯ
     elif step == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "age"
         await update.message.reply_text("Сколько тебе лет?")
 
-    # ВОЗРАСТ
     elif step == "age":
         if not text.isdigit():
             await update.message.reply_text("Напиши возраст цифрами 🙂")
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
-        await update.message.reply_text("Откуда ты? Город или страна 🤍")
+        await update.message.reply_text(
+            "Откуда ты?🤍"
+        )
 
-    # ГОРОД
     elif step == "city":
         context.user_data["city"] = text
         context.user_data["step"] = "photo"
@@ -134,7 +138,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=photo_kb()
         )
 
-    # ПРОПУСК ФОТО
     elif step == "photo" and text == "Пропустить":
         context.user_data["photo"] = None
         context.user_data["step"] = "looking"
@@ -146,13 +149,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "— открыт(а) к отношениям"
         )
 
-    # ЦЕЛЬ
     elif step == "looking":
         context.user_data["looking"] = text
         context.user_data["step"] = "confirm"
 
         d = context.user_data
-        profile = (
+        profile_view = (
             "Спасибо 🤍\n"
             "Вот как тебя увидят другие:\n\n"
             f"{d['name']}\n"
@@ -160,11 +162,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Всё верно?"
         )
 
-        await update.message.reply_text(profile, reply_markup=confirm_kb())
+        await update.message.reply_text(
+            profile_view,
+            reply_markup=confirm_kb()
+        )
 
 
 # ================== ФОТО ==================
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_photo(update, context):
     if context.user_data.get("step") != "photo":
         return
 
@@ -183,14 +188,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================== СОХРАНЕНИЕ ==================
-async def save_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def save_profile(update, context):
     d = context.user_data
-    user_id = update.effective_user.id
+    user_id = update.message.from_user.id
 
     with conn.cursor() as c:
         c.execute("""
-        INSERT INTO users (user_id, gender, name, age, city, looking, photo, last_seen)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO users (user_id, gender, name, age, city, looking, photo)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (user_id) DO UPDATE SET
             gender=EXCLUDED.gender,
             name=EXCLUDED.name,
@@ -198,7 +203,7 @@ async def save_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             city=EXCLUDED.city,
             looking=EXCLUDED.looking,
             photo=EXCLUDED.photo,
-            last_seen=EXCLUDED.last_seen;
+            last_seen=NOW()
         """, (
             user_id,
             d.get("gender"),
@@ -207,7 +212,6 @@ async def save_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             d.get("city"),
             d.get("looking"),
             d.get("photo"),
-            datetime.utcnow()
         ))
 
     context.user_data.clear()
@@ -219,34 +223,35 @@ async def save_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "– смотреть анкеты других\n"
         "– находить близких по духу людей\n"
         "– общаться и знакомиться",
-        reply_markup=main_menu_kb()
+        reply_markup=menu_after_profile()
     )
 
 
 # ================== РОУТЕР ==================
-async def router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def router(update, context):
     text = update.message.text
 
-    if text == "Подтвердить":
+    if text == "Моя анкета":
+        await start_profile(update, context)
+
+    elif text == "Подтвердить":
         await save_profile(update, context)
 
     elif text == "Изменить":
         await start_profile(update, context)
 
-    elif text == "Моя анкета":
-        await start_profile(update, context)
-
     elif text == "Поиск людей":
         await update.message.reply_text(
-            "Раздел поиска скоро будет доступен 🤍",
-            reply_markup=main_menu_kb()
+            "Ты в разделе поиска 🤍\n\n"
+            "Функция скоро будет доступна.",
+            reply_markup=menu_after_profile()
         )
 
     else:
         await handle_text(update, context)
 
 
-# ================== ЗАПУСК ==================
+# ================== MAIN ==================
 def main():
     init_db()
 
