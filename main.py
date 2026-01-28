@@ -175,13 +175,13 @@ async def send_profile(user_id: int, to_user: int):
 
     role, goal, city, about = u
     text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="♥️", callback_data=f"skip_{user_id}"),
-            InlineKeyboardButton(text="❌", callback_data=f"like_{user_id}")
-        ]
-    ])
+kb = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(text="♥️", callback_data=f"like_{user_id}"),
+        InlineKeyboardButton(text="❌", callback_data=f"skip_{user_id}")
+    ]
+])
+    
 
     await bot.send_message(to_user, text, reply_markup=kb)
 
