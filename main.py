@@ -4,12 +4,7 @@ import aiosqlite
 import os
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
@@ -34,8 +29,7 @@ async def init_db():
             goal TEXT,
             child_age TEXT,
             city TEXT,
-            about TEXT,
-            active INTEGER DEFAULT 1
+            about TEXT
         )
         """)
         await db.execute("""
@@ -70,10 +64,8 @@ async def start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "Привет 🤍\n\n"
-        "Этот бот создан для родителей и тех, кому сейчас нужна поддержка.\n"
-        "Здесь можно найти компанию для прогулок с детьми или тёплое общение — "
-        "без спешки и без давления.\n\n"
-        "Давайте познакомимся немного 🌱",
+        "Здесь можно найти тёплое общение и поддержку.\n"
+        "Давайте познакомимся 🌱",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Начать", callback_data="start_form")]
         ])
@@ -90,7 +82,7 @@ async def start_form(call: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text="👩‍🍼 Мама", callback_data="role_Мама")],
             [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
             [InlineKeyboardButton(text="🤍 Будущий родитель", callback_data="role_Будущий родитель")],
-            [InlineKeyboardButton(text="🌱 Просто ищу поддержку", callback_data="role_Поддержка")]
+            [InlineKeyboardButton(text="🌱 Ищу поддержку", callback_data="role_Поддержка")]
         ])
     )
 
@@ -100,12 +92,11 @@ async def role_chosen(call: CallbackQuery, state: FSMContext):
     await state.update_data(role=call.data.replace("role_", ""))
     await state.set_state(Profile.goal)
     await call.message.edit_text(
-        "Что для вас сейчас важнее всего?",
+        "Что для вас сейчас важно?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🚶‍♀️ Совместные прогулки с детьми", callback_data="goal_Прогулки")],
-            [InlineKeyboardButton(text="💬 Общение и поддержка", callback_data="goal_Поддержка")],
-            [InlineKeyboardButton(text="🎀 Поддержка в важный период", callback_data="goal_Период")],
-            [InlineKeyboardButton(text="🤝 Всё вместе, без спешки", callback_data="goal_Всё")]
+            [InlineKeyboardButton(text="🚶‍♀️ Прогулки", callback_data="goal_Прогулки")],
+            [InlineKeyboardButton(text="💬 Общение", callback_data="goal_Общение")],
+            [InlineKeyboardButton(text="🤝 Всё вместе", callback_data="goal_Всё")]
         ])
     )
 
@@ -115,13 +106,13 @@ async def goal_chosen(call: CallbackQuery, state: FSMContext):
     await state.update_data(goal=call.data.replace("goal_", ""))
     await state.set_state(Profile.child_age)
     await call.message.edit_text(
-        "Если хотите, укажите возраст ребёнка.\nМожно пропустить.",
+        "Возраст ребёнка (можно пропустить)",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🤰 Ещё ждём", callback_data="age_Ещё ждём")],
-            [InlineKeyboardButton(text="👶 0–1 год", callback_data="age_0–1")],
-            [InlineKeyboardButton(text="🧸 1–3 года", callback_data="age_1–3")],
-            [InlineKeyboardButton(text="🏃‍♂️ 3–6 лет", callback_data="age_3–6")],
-            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="age_Пропустить")]
+            [InlineKeyboardButton(text="👶 0–1", callback_data="age_0–1")],
+            [InlineKeyboardButton(text="🧸 1–3", callback_data="age_1–3")],
+            [InlineKeyboardButton(text="🏃 3–6", callback_data="age_3–6")],
+            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="age_skip")]
         ])
     )
 
@@ -129,7 +120,7 @@ async def goal_chosen(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(Profile.child_age)
 async def age_chosen(call: CallbackQuery, state: FSMContext):
     age = call.data.replace("age_", "")
-    await state.update_data(child_age=None if age == "Пропустить" else age)
+    await state.update_data(child_age=None if age == "skip" else age)
     await state.set_state(Profile.city)
     await call.message.edit_text("В каком городе вы находитесь?")
 
@@ -138,10 +129,7 @@ async def age_chosen(call: CallbackQuery, state: FSMContext):
 async def city_entered(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Profile.about)
-    await message.answer(
-        "Если хотите, напишите пару слов о себе.\n"
-        "Или отправьте «Пропустить»."
-    )
+    await message.answer("Пару слов о себе или «Пропустить»")
 
 
 @dp.message(Profile.about)
@@ -152,7 +140,7 @@ async def about_entered(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
         await db.execute("""
         INSERT OR REPLACE INTO users
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             message.from_user.id,
             message.from_user.username,
@@ -166,48 +154,88 @@ async def about_entered(message: Message, state: FSMContext):
 
     await state.clear()
     await message.answer(
-        "Спасибо 🤍 Ваша анкета создана.",
+        "🤍 Анкета создана",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
         ])
     )
 
 
-# ---------- BROWSING ----------
-@dp.callback_query(F.data == "browse")
-async def browse(call: CallbackQuery):
+# ---------- SEND PROFILE ----------
+async def send_profile(user_id: int, to_user: int, actions=False):
     async with aiosqlite.connect(DB) as db:
         cursor = await db.execute("""
-        SELECT user_id, role, goal, child_age, city, about
-        FROM users
+        SELECT role, goal, city, about
+        FROM users WHERE user_id=?
+        """, (user_id,))
+        u = await cursor.fetchone()
+
+    if not u:
+        return
+
+    role, goal, city, about = u
+    text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
+
+    kb = None
+    if actions:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="❤️ Нравится", callback_data=f"like_{user_id}"),
+                InlineKeyboardButton(text="➡️ Дальше", callback_data="browse")
+            ]
+        ])
+
+    await bot.send_message(to_user, text, reply_markup=kb)
+
+
+# ---------- SMART BROWSE ----------
+@dp.callback_query(F.data == "browse")
+async def browse(call: CallbackQuery):
+    me = call.from_user.id
+
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT city, goal FROM users WHERE user_id=?",
+            (me,)
+        )
+        my = await cur.fetchone()
+        if not my:
+            await call.message.answer("Сначала создайте анкету 🤍")
+            return
+
+        city, goal = my
+
+        cur = await db.execute("""
+        SELECT user_id FROM users
         WHERE user_id != ?
+          AND city = ?
+          AND goal = ?
           AND user_id NOT IN (
               SELECT to_user FROM likes WHERE from_user=?
           )
-        ORDER BY RANDOM()
-        LIMIT 1
-        """, (call.from_user.id, call.from_user.id))
-        user = await cursor.fetchone()
+        ORDER BY RANDOM() LIMIT 1
+        """, (me, city, goal, me))
+        row = await cur.fetchone()
 
-    if not user:
-        await call.message.answer("Пока анкет нет 🤍")
+        if not row:
+            cur = await db.execute("""
+            SELECT user_id FROM users
+            WHERE user_id != ?
+              AND user_id NOT IN (
+                  SELECT to_user FROM likes WHERE from_user=?
+              )
+            ORDER BY RANDOM() LIMIT 1
+            """, (me, me))
+            row = await cur.fetchone()
+
+    if not row:
+        await call.message.answer("Пока подходящих анкет нет 🤍")
         return
 
-    uid, role, goal, child_age, city, about = user
-    text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
-
-    await call.message.answer(
-        text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="💚 Лайк", callback_data=f"like_{uid}"),
-                InlineKeyboardButton(text="⏭ Дальше", callback_data="browse")
-            ]
-        ])
-    )
+    await send_profile(row[0], me, actions=True)
 
 
-# ---------- LIKE + MATCH ----------
+# ---------- LIKE ----------
 @dp.callback_query(F.data.startswith("like_"))
 async def like(call: CallbackQuery):
     from_user = call.from_user.id
@@ -219,55 +247,43 @@ async def like(call: CallbackQuery):
             (from_user, to_user)
         )
 
-        cursor = await db.execute(
+        cur = await db.execute(
             "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
             (to_user, from_user)
         )
-        mutual = await cursor.fetchone()
+        mutual = await cur.fetchone()
 
-        if not mutual:
-            await bot.send_message(
-                to_user,
-                "💚 Кто-то лайкнул вас 🤍"
-            )
-        else:
+        if mutual:
             await db.execute(
                 "INSERT OR IGNORE INTO matches VALUES (?, ?)",
                 (min(from_user, to_user), max(from_user, to_user))
             )
 
-            await bot.send_message(
-                from_user,
-                "💫 Это взаимно!\nВы можете написать первым 💌",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="💌 Написать первым",
-                        url=f"tg://user?id={to_user}"
-                    )]
-                ])
-            )
-
-            await bot.send_message(
-                to_user,
-                "💫 У вас взаимная симпатия 🤍",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="💬 Написать",
-                        url=f"tg://user?id={from_user}"
-                    )]
-                ])
-            )
+            for a, b in [(from_user, to_user), (to_user, from_user)]:
+                await bot.send_message(
+                    a,
+                    "💫 У вас взаимная симпатия",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text="💬 Написать",
+                            url=f"tg://user?id={b}"
+                        )]
+                    ])
+                )
+        else:
+            # отправляем анкету лайкнувшего
+            await send_profile(from_user, to_user, actions=True)
 
         await db.commit()
 
-    await call.answer("Готово 🤍")
-    await browse(call)
+    await call.answer("🤍")
 
 
 # ---------- RUN ----------
 async def main():
     await init_db()
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
