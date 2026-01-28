@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import aiosqlite
+import os
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
@@ -13,7 +14,6 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
-import os
 TOKEN = os.getenv("BOT_TOKEN")
 
 logging.basicConfig(level=logging.INFO)
@@ -181,9 +181,12 @@ async def browse(call: CallbackQuery):
         SELECT user_id, role, goal, child_age, city, about
         FROM users
         WHERE user_id != ?
+          AND user_id NOT IN (
+              SELECT to_user FROM likes WHERE from_user=?
+          )
         ORDER BY RANDOM()
         LIMIT 1
-        """, (call.from_user.id,))
+        """, (call.from_user.id, call.from_user.id))
         user = await cursor.fetchone()
 
     if not user:
