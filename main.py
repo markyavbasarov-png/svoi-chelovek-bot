@@ -14,16 +14,10 @@ from telegram.ext import (
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN не задан")
+if not BOT_TOKEN or not DATABASE_URL:
+    raise RuntimeError("❌ BOT_TOKEN или DATABASE_URL не заданы")
 
-if not DATABASE_URL:
-    raise RuntimeError("❌ DATABASE_URL не задан")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ================= DB =================
@@ -53,22 +47,22 @@ def init_db():
         """)
         conn.commit()
     conn.close()
-    logger.info("База данных инициализирована")
+    logger.info("DB готова")
 
 # ================= KEYBOARDS =================
 main_keyboard = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("🔍 Смотреть анкеты")],
-        [KeyboardButton("👤 Моя анкета")],
-        [KeyboardButton("➕ Создать анкету")]
+        ["🔍 Смотреть анкеты"],
+        ["👤 Моя анкета"],
+        ["➕ Создать анкету"]
     ],
     resize_keyboard=True
 )
 
 browse_keyboard = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("❤️ Лайк"), KeyboardButton("➡️ Пропустить")],
-        [KeyboardButton("👤 Моя анкета")]
+        ["❤️ Лайк", "➡️ Пропустить"],
+        ["👤 Моя анкета"]
     ],
     resize_keyboard=True
 )
@@ -77,8 +71,7 @@ browse_keyboard = ReplyKeyboardMarkup(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
-        "💖 Добро пожаловать в «СвойЧеловек»\n\n"
-        "Здесь можно найти близкого по духу человека 🤍",
+        "💖 Добро пожаловать в «СвойЧеловек»",
         reply_markup=main_keyboard
     )
 
@@ -100,7 +93,7 @@ async def handle_profile(update, context):
 
     if step == "age":
         if not text.isdigit() or not (16 <= int(text) <= 100):
-            await update.message.reply_text("Введите возраст цифрами (16–100)")
+            await update.message.reply_text("Возраст от 16 до 100")
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
@@ -125,20 +118,12 @@ async def handle_profile(update, context):
         await update.message.reply_text("📸 Пришли одно фото для анкеты")
         return
 
-# ================= PHOTO HANDLER =================
+# ================= PHOTO =================
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
         return
 
-    # Фото может прийти как photo ИЛИ document
-    if update.message.photo:
-        file_id = update.message.photo[-1].file_id
-    elif update.message.document and update.message.document.mime_type.startswith("image/"):
-        file_id = update.message.document.file_id
-    else:
-        await update.message.reply_text("❌ Пришли именно фото 📸")
-        return
-
+    photo_id = update.message.photo[-1].file_id
     user_id = update.effective_user.id
 
     conn = get_connection()
@@ -160,92 +145,70 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["city"],
             context.user_data["looking"],
             context.user_data["about"],
-            file_id
+            photo_id
         ))
         conn.commit()
     conn.close()
 
     context.user_data.clear()
-
-    await update.message.reply_text("💖 Анкета сохранена!", reply_markup=main_keyboard)
-    await my_profile(update, context)
+    await update.message.reply_text(
+        "💖 Анкета сохранена!",
+        reply_markup=main_keyboard
+    )
 
 # ================= SHOW PROFILES =================
 def get_random_profile(user_id):
     conn = get_connection()
     with conn.cursor() as c:
         c.execute("SELECT city FROM users WHERE user_id=%s", (user_id,))
-        res = c.fetchone()
-        if not res:
-            conn.close()
+        city = c.fetchone()
+        if not city:
             return None
-
-        city = res[0]
 
         c.execute("""
         SELECT user_id, gender, age, city, looking, about, photo_id
         FROM users
-        WHERE user_id != %s AND city = %s
-        ORDER BY RANDOM()
-        LIMIT 1
-        """, (user_id, city))
-
+        WHERE user_id != %s AND city=%s
+        ORDER BY RANDOM() LIMIT 1
+        """, (user_id, city[0]))
         row = c.fetchone()
-
     conn.close()
     return row
 
 async def show_profile(update, context):
     profile = get_random_profile(update.effective_user.id)
-
     if not profile:
-        await update.message.reply_text(
-            "😔 В твоём городе пока нет анкет",
-            reply_markup=main_keyboard
-        )
+        await update.message.reply_text("Анкет пока нет 😔", reply_markup=main_keyboard)
         return
 
-    context.user_data["current_profile"] = profile[0]
+    uid, gender, age, city, looking, about, photo_id = profile
+    context.user_data["current_profile"] = uid
 
-    _, gender, age, city, looking, about, photo_id = profile
-    text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
-
-    if photo_id:
-        await update.message.reply_photo(photo=photo_id, caption=text, reply_markup=browse_keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=browse_keyboard)
+    await update.message.reply_photo(
+        photo=photo_id,
+        caption=f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
+        reply_markup=browse_keyboard
+    )
 
 # ================= LIKE =================
 async def like_profile(update, context):
     from_user = update.effective_user.id
     to_user = context.user_data.get("current_profile")
-
     if not to_user:
-        await update.message.reply_text("Сначала выбери анкету")
-        return
+        return await update.message.reply_text("Нет анкеты")
 
     conn = get_connection()
     with conn.cursor() as c:
-        c.execute("""
-        INSERT INTO likes (from_user, to_user)
-        VALUES (%s,%s)
-        ON CONFLICT DO NOTHING
-        """, (from_user, to_user))
-
-        c.execute("""
-        SELECT 1 FROM likes
-        WHERE from_user=%s AND to_user=%s
-        """, (to_user, from_user))
-
+        c.execute("INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                  (from_user, to_user))
+        c.execute("SELECT 1 FROM likes WHERE from_user=%s AND to_user=%s",
+                  (to_user, from_user))
         match = c.fetchone()
         conn.commit()
     conn.close()
 
     if match:
-        await update.message.reply_text(
-            "💞 У вас взаимная симпатия!",
-            reply_markup=main_keyboard
-        )
+        await update.message.reply_text("💞 У вас взаимная симпатия!")
 
     await show_profile(update, context)
 
@@ -261,19 +224,14 @@ async def my_profile(update, context):
     conn.close()
 
     if not p:
-        await update.message.reply_text(
-            "Анкета не найдена 😔",
-            reply_markup=main_keyboard
-        )
-        return
+        return await update.message.reply_text("Анкета не найдена")
 
     gender, age, city, looking, about, photo_id = p
-    text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
-
-    if photo_id:
-        await update.message.reply_photo(photo=photo_id, caption=text, reply_markup=main_keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=main_keyboard)
+    await update.message.reply_photo(
+        photo=photo_id,
+        caption=f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
+        reply_markup=main_keyboard
+    )
 
 # ================= ROUTER =================
 async def router(update, context):
