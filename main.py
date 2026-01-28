@@ -18,10 +18,9 @@ from aiogram.fsm.state import StatesGroup, State
 import aiosqlite
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+DB_NAME = "dating.db"
 
 logging.basicConfig(level=logging.INFO)
-
-DB_NAME = "dating.db"
 
 # ======================= DB =======================
 
@@ -35,11 +34,7 @@ async def init_db():
             age INTEGER,
             city TEXT,
             looking_for TEXT,
-            about TEXT,
-            search_gender TEXT,
-            age_from INTEGER,
-            age_to INTEGER,
-            search_city TEXT
+            about TEXT
         )
         """)
         await db.execute("""
@@ -68,10 +63,6 @@ class Profile(StatesGroup):
     ASK_LOOKING_FOR = State()
     ASK_ABOUT = State()
     CONFIRM = State()
-    FILTER_GENDER = State()
-    FILTER_AGE_FROM = State()
-    FILTER_AGE_TO = State()
-    FILTER_CITY = State()
 
 class Browse(StatesGroup):
     SHOW_PROFILE = State()
@@ -84,9 +75,7 @@ start_kb = ReplyKeyboardMarkup(
 )
 
 gender_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="👨 Мужчина"), KeyboardButton(text="👩 Женщина")]
-    ],
+    keyboard=[[KeyboardButton(text="👨 Мужчина"), KeyboardButton(text="👩 Женщина")]],
     resize_keyboard=True
 )
 
@@ -119,22 +108,6 @@ browse_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-filter_gender_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="👩 Женщины"), KeyboardButton(text="👨 Мужчины")],
-    
-    ],
-    resize_keyboard=True
-)
-filter_city_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="🏙 Мой город")],
-        [KeyboardButton(text="🌍 Любой город")]
-    ],
-    resize_keyboard=True
-)
-
-
 # ======================= BOT =======================
 
 bot = Bot(BOT_TOKEN)
@@ -162,7 +135,7 @@ async def begin_profile(message: Message, state: FSMContext):
     await state.set_state(Profile.ASK_GENDER)
     await message.answer("Кто ты?", reply_markup=gender_kb)
 
-# ======================= PROFILE FLOW =======================
+# ======================= PROFILE =======================
 
 @dp.message(Profile.ASK_GENDER)
 async def save_gender(message: Message, state: FSMContext):
@@ -202,8 +175,7 @@ async def save_looking(message: Message, state: FSMContext):
     await state.update_data(looking_for=lf)
     await state.set_state(Profile.ASK_ABOUT)
     await message.answer(
-        "Хочешь — напиши пару слов о себе.\n"
-        "Что-то важное, тёплое или настоящее 🤍",
+        "Хочешь — напиши пару слов о себе 🤍",
         reply_markup=about_kb
     )
 
@@ -230,78 +202,27 @@ async def confirm_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
         INSERT OR REPLACE INTO users
-        (user_id, gender, name, age, city, looking_for)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (user_id, gender, name, age, city, looking_for, about)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             message.from_user.id,
             data["gender"],
             data["name"],
             data["age"],
             data["city"],
-            data["looking_for"]
-        ))
-        await db.commit()
-
-    await state.set_state(Profile.FILTER_GENDER)
-    await message.answer("Кто тебе интересен? 🤍", reply_markup=filter_gender_kb)
-
-# ======================= FILTERS =======================
-
-@dp.message(Profile.FILTER_GENDER)
-async def filter_gender(message: Message, state: FSMContext):
-    if "Женщины" in message.text:
-        sg = "female"
-    elif "Мужчины" in message.text:
-        sg = "male"
-    else:
-        sg = "any"
-    await state.update_data(search_gender=sg)
-    await state.set_state(Profile.FILTER_AGE_FROM)
-    await message.answer("С какого возраста показывать анкеты?")
-
-@dp.message(Profile.FILTER_AGE_FROM)
-async def filter_age_from(message: Message, state: FSMContext):
-    await state.update_data(age_from=int(message.text))
-    await state.set_state(Profile.FILTER_AGE_TO)
-    await message.answer("До какого возраста?")
-
-@dp.message(Profile.FILTER_AGE_TO)
-async def filter_age_to(message: Message, state: FSMContext):
-    await state.update_data(age_to=int(message.text))
-    await state.set_state(Profile.FILTER_CITY)
-    await message.answer("В каком городе искать?", reply_markup=filter_city_kb)
-
-@dp.message(Profile.FILTER_CITY)
-async def filter_city(message: Message, state: FSMContext):
-    data = await state.get_data()
-    city = None if "Любой" in message.text else data["city"]
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("""
-        UPDATE users SET
-        search_gender=?, age_from=?, age_to=?, search_city=?
-        WHERE user_id=?
-        """, (
-            data["search_gender"],
-            data["age_from"],
-            data["age_to"],
-            city,
-            message.from_user.id
+            data["looking_for"],
+            data["about"]
         ))
         await db.commit()
 
     await state.set_state(Browse.SHOW_PROFILE)
+    await message.answer("Отлично 🤍 Сейчас покажу анкеты", reply_markup=browse_kb)
     await show_profile(message, state)
 
 # ======================= BROWSING =======================
 
 async def show_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
-        user = await db.execute_fetchone(
-            "SELECT * FROM users WHERE user_id=?",
-            (message.from_user.id,)
-        )
-
         candidates = await db.execute_fetchall("""
         SELECT * FROM users
         WHERE user_id != ?
@@ -329,7 +250,7 @@ async def show_profile(message: Message, state: FSMContext):
 
     await message.answer(text, reply_markup=browse_kb)
 
-# ======================= LIKE LOGIC =======================
+# ======================= LIKE =======================
 
 @dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
 async def like_profile(message: Message, state: FSMContext):
@@ -349,38 +270,15 @@ async def like_profile(message: Message, state: FSMContext):
         await db.commit()
 
     if mutual:
-        link1 = InlineKeyboardMarkup(
+        link = InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(
                 text="💬 Написать",
                 url=f"https://t.me/user?id={target}"
             )]]
         )
-        link2 = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"https://t.me/user?id={message.from_user.id}"
-            )]]
-        )
-
-        await bot.send_message(
-            target,
-            "Кажется, это взаимно 💫\n\n"
-            "Вы понравились друг другу.\n"
-            "Самое время написать лично 🤍\n\n"
-            "Бот не видит и не хранит ваши переписки 🤍",
-            reply_markup=link2
-        )
-
         await message.answer(
-            "Кажется, это взаимно 💫\n"
-            "Можете написать друг другу 🤍",
-            reply_markup=link1
-        )
-
-    else:
-        await message.answer(
-            "Ты отметил(а), что тебе понравился этот человек 🤍\n"
-            "Посмотрим, что будет дальше…"
+            "Кажется, это взаимно 💫\nМожете написать друг другу 🤍",
+            reply_markup=link
         )
 
     await show_profile(message, state)
