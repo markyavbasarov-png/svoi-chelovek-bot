@@ -1,4 +1,5 @@
 import os
+import logging
 import psycopg2
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -12,6 +13,18 @@ from telegram.ext import (
 # ================= НАСТРОЙКИ =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not BOT_TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не задан")
+
+if not DATABASE_URL:
+    raise RuntimeError("❌ DATABASE_URL не задан")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # ================= DB =================
 def get_connection():
@@ -39,6 +52,7 @@ def init_db():
         """)
         conn.commit()
     conn.close()
+    logger.info("База данных инициализирована")
 
 # ================= KEYBOARDS =================
 main_keyboard = ReplyKeyboardMarkup(
@@ -75,7 +89,7 @@ async def create_profile(update, context):
 
 async def handle_profile(update, context):
     step = context.user_data.get("step")
-    text = update.message.text
+    text = update.message.text.strip()
 
     if step == "gender":
         context.user_data["gender"] = text
@@ -84,8 +98,8 @@ async def handle_profile(update, context):
         return
 
     if step == "age":
-        if not text.isdigit():
-            await update.message.reply_text("Введите возраст цифрами 🙂")
+        if not text.isdigit() or not (16 <= int(text) <= 100):
+            await update.message.reply_text("Введите возраст цифрами (16–100)")
             return
         context.user_data["age"] = int(text)
         context.user_data["step"] = "city"
@@ -106,6 +120,7 @@ async def handle_profile(update, context):
 
     if step == "about":
         user_id = update.effective_user.id
+
         conn = get_connection()
         with conn.cursor() as c:
             c.execute("""
@@ -134,11 +149,10 @@ async def handle_profile(update, context):
             reply_markup=main_keyboard
         )
 
-# ================= SHOW PROFILES (С ФИЛЬТРОМ ПО ГОРОДУ) =================
+# ================= SHOW PROFILES =================
 def get_random_profile(user_id):
     conn = get_connection()
     with conn.cursor() as c:
-        # получаем город пользователя
         c.execute("SELECT city FROM users WHERE user_id=%s", (user_id,))
         res = c.fetchone()
         if not res:
@@ -150,8 +164,7 @@ def get_random_profile(user_id):
         c.execute("""
         SELECT user_id, gender, age, city, looking, about
         FROM users
-        WHERE user_id != %s
-          AND city = %s
+        WHERE user_id != %s AND city = %s
         ORDER BY RANDOM()
         LIMIT 1
         """, (user_id, city))
@@ -166,8 +179,7 @@ async def show_profile(update, context):
 
     if not profile:
         await update.message.reply_text(
-            "😔 В твоём городе пока нет анкет.\n"
-            "Пригласи друзей 🤍",
+            "😔 В твоём городе пока нет анкет",
             reply_markup=main_keyboard
         )
         return
@@ -175,14 +187,10 @@ async def show_profile(update, context):
     context.user_data["current_profile"] = profile[0]
 
     _, gender, age, city, looking, about = profile
-    text = (
-        f"👤 {gender}, {age}\n"
-        f"📍 {city}\n"
-        f"🎯 {looking}\n\n"
-        f"💬 {about}"
+    await update.message.reply_text(
+        f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
+        reply_markup=browse_keyboard
     )
-
-    await update.message.reply_text(text, reply_markup=browse_keyboard)
 
 # ================= LIKE =================
 async def like_profile(update, context):
@@ -190,6 +198,7 @@ async def like_profile(update, context):
     to_user = context.user_data.get("current_profile")
 
     if not to_user:
+        await update.message.reply_text("Сначала выбери анкету")
         return
 
     conn = get_connection()
@@ -264,6 +273,7 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+    logger.info("🚀 Бот запущен")
     app.run_polling()
 
 if __name__ == "__main__":
