@@ -128,7 +128,7 @@ filter_gender_kb = ReplyKeyboardMarkup(
 )
 filter_city_kb = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="🏙 Мой город")] 
+        [KeyboardButton(text="🏙 Мой город")],
         [KeyboardButton(text="🌍 Любой город")]
     ],
     resize_keyboard=True
