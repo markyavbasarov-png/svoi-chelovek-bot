@@ -40,7 +40,8 @@ def init_db():
             age INT,
             city TEXT,
             looking TEXT,
-            about TEXT
+            about TEXT,
+            photo_id TEXT
         );
         """)
         c.execute("""
@@ -119,35 +120,51 @@ async def handle_profile(update, context):
         return
 
     if step == "about":
-        user_id = update.effective_user.id
+        context.user_data["about"] = text
+        context.user_data["step"] = "photo"
+        await update.message.reply_text("📸 Пришли одно фото для анкеты")
+        return
 
-        conn = get_connection()
-        with conn.cursor() as c:
-            c.execute("""
-            INSERT INTO users (user_id, gender, age, city, looking, about)
-            VALUES (%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (user_id) DO UPDATE SET
-                gender=EXCLUDED.gender,
-                age=EXCLUDED.age,
-                city=EXCLUDED.city,
-                looking=EXCLUDED.looking,
-                about=EXCLUDED.about
-            """, (
-                user_id,
-                context.user_data["gender"],
-                context.user_data["age"],
-                context.user_data["city"],
-                context.user_data["looking"],
-                text
-            ))
-            conn.commit()
-        conn.close()
+# ================= PHOTO HANDLER =================
+async def handle_photo(update, context):
+    if context.user_data.get("step") != "photo":
+        return
 
-        context.user_data.clear()
-        await update.message.reply_text(
-            "💖 Анкета сохранена!",
-            reply_markup=main_keyboard
-        )
+    if not update.message.photo:
+        await update.message.reply_text("❌ Это не фото. Пришли фото 📸")
+        return
+
+    photo_id = update.message.photo[-1].file_id
+    user_id = update.effective_user.id
+
+    conn = get_connection()
+    with conn.cursor() as c:
+        c.execute("""
+        INSERT INTO users (user_id, gender, age, city, looking, about, photo_id)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (user_id) DO UPDATE SET
+            gender=EXCLUDED.gender,
+            age=EXCLUDED.age,
+            city=EXCLUDED.city,
+            looking=EXCLUDED.looking,
+            about=EXCLUDED.about,
+            photo_id=EXCLUDED.photo_id
+        """, (
+            user_id,
+            context.user_data["gender"],
+            context.user_data["age"],
+            context.user_data["city"],
+            context.user_data["looking"],
+            context.user_data["about"],
+            photo_id
+        ))
+        conn.commit()
+    conn.close()
+
+    context.user_data.clear()
+
+    await update.message.reply_text("💖 Анкета сохранена!")
+    await my_profile(update, context)
 
 # ================= SHOW PROFILES =================
 def get_random_profile(user_id):
@@ -162,7 +179,7 @@ def get_random_profile(user_id):
         city = res[0]
 
         c.execute("""
-        SELECT user_id, gender, age, city, looking, about
+        SELECT user_id, gender, age, city, looking, about, photo_id
         FROM users
         WHERE user_id != %s AND city = %s
         ORDER BY RANDOM()
@@ -186,11 +203,13 @@ async def show_profile(update, context):
 
     context.user_data["current_profile"] = profile[0]
 
-    _, gender, age, city, looking, about = profile
-    await update.message.reply_text(
-        f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
-        reply_markup=browse_keyboard
-    )
+    _, gender, age, city, looking, about, photo_id = profile
+    text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
+
+    if photo_id:
+        await update.message.reply_photo(photo=photo_id, caption=text, reply_markup=browse_keyboard)
+    else:
+        await update.message.reply_text(text, reply_markup=browse_keyboard)
 
 # ================= LIKE =================
 async def like_profile(update, context):
@@ -231,7 +250,7 @@ async def my_profile(update, context):
     conn = get_connection()
     with conn.cursor() as c:
         c.execute("""
-        SELECT gender, age, city, looking, about
+        SELECT gender, age, city, looking, about, photo_id
         FROM users WHERE user_id=%s
         """, (update.effective_user.id,))
         p = c.fetchone()
@@ -244,11 +263,13 @@ async def my_profile(update, context):
         )
         return
 
-    gender, age, city, looking, about = p
-    await update.message.reply_text(
-        f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
-        reply_markup=main_keyboard
-    )
+    gender, age, city, looking, about, photo_id = p
+    text = f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}"
+
+    if photo_id:
+        await update.message.reply_photo(photo=photo_id, caption=text, reply_markup=main_keyboard)
+    else:
+        await update.message.reply_text(text, reply_markup=main_keyboard)
 
 # ================= ROUTER =================
 async def router(update, context):
@@ -271,8 +292,11 @@ async def router(update, context):
 def main():
     init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
+
     logger.info("🚀 Бот запущен")
     app.run_polling()
 
