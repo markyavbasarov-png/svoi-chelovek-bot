@@ -122,18 +122,18 @@ browse_kb = ReplyKeyboardMarkup(
 filter_gender_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="👩 Женщины"), KeyboardButton(text="👨 Мужчины")],
-        [KeyboardButton(text="🌈 Неважно")]
+    
     ],
     resize_keyboard=True
 )
-
 filter_city_kb = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="🌆 Мой город")],
+        [KeyboardButton(text="🏙 Мой город")] 
         [KeyboardButton(text="🌍 Любой город")]
     ],
     resize_keyboard=True
 )
+
 
 # ======================= BOT =======================
 
