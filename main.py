@@ -29,7 +29,8 @@ async def init_db():
             goal TEXT,
             child_age TEXT,
             city TEXT,
-            about TEXT
+            about TEXT,
+            photo_id TEXT
         )
         """)
         await db.execute("""
@@ -56,6 +57,7 @@ class Profile(StatesGroup):
     child_age = State()
     city = State()
     about = State()
+    photo = State()
 
 
 # ---------- START ----------
@@ -138,25 +140,35 @@ async def city_entered(message: Message, state: FSMContext):
 
 
 @dp.callback_query(F.data == "about_skip", Profile.about)
-async def about_skipped(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
+async def about_skip(call: CallbackQuery, state: FSMContext):
+    await state.update_data(about=None)
+    await state.set_state(Profile.photo)
+    await call.message.edit_text(
+        "Хотите добавить фото?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📷 Добавить фото", callback_data="add_photo")],
+            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
+        ])
+    )
 
-    async with aiosqlite.connect(DB) as db:
-        await db.execute("""
-        INSERT OR REPLACE INTO users
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            call.from_user.id,
-            call.from_user.username,
-            data["role"],
-            data["goal"],
-            data["child_age"],
-            data["city"],
-            None
-        ))
-        await db.commit()
 
-    await state.clear()
+@dp.message(Profile.about)
+async def about_entered(message: Message, state: FSMContext):
+    await state.update_data(about=message.text)
+    await state.set_state(Profile.photo)
+    await message.answer(
+        "Хотите добавить фото?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📷 Добавить фото", callback_data="add_photo")],
+            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
+        ])
+    )
+
+
+# ---------- PHOTO ----------
+@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await save_profile(call.from_user, state, None)
     await call.message.edit_text(
         "🤍 Анкета создана",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -165,26 +177,15 @@ async def about_skipped(call: CallbackQuery, state: FSMContext):
     )
 
 
-@dp.message(Profile.about)
-async def about_entered(message: Message, state: FSMContext):
-    data = await state.get_data()
+@dp.callback_query(F.data == "add_photo", Profile.photo)
+async def ask_photo(call: CallbackQuery):
+    await call.message.edit_text("Отправьте одно фото 📷")
 
-    async with aiosqlite.connect(DB) as db:
-        await db.execute("""
-        INSERT OR REPLACE INTO users
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            message.from_user.id,
-            message.from_user.username,
-            data["role"],
-            data["goal"],
-            data["child_age"],
-            data["city"],
-            message.text
-        ))
-        await db.commit()
 
-    await state.clear()
+@dp.message(Profile.photo, F.photo)
+async def photo_received(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+    await save_profile(message.from_user, state, photo_id)
     await message.answer(
         "🤍 Анкета создана",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -193,7 +194,27 @@ async def about_entered(message: Message, state: FSMContext):
     )
 
 
-# ---------- WAITING SCREEN ----------
+async def save_profile(user, state, photo_id):
+    data = await state.get_data()
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("""
+        INSERT OR REPLACE INTO users
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user.id,
+            user.username,
+            data["role"],
+            data["goal"],
+            data["child_age"],
+            data["city"],
+            data.get("about"),
+            photo_id
+        ))
+        await db.commit()
+    await state.clear()
+
+
+# ---------- WAITING ----------
 async def waiting_screen(user_id: int):
     await bot.send_message(
         user_id,
@@ -209,7 +230,7 @@ async def waiting_screen(user_id: int):
 async def send_profile(user_id: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-        SELECT role, goal, city, about
+        SELECT role, goal, city, about, photo_id
         FROM users WHERE user_id=?
         """, (user_id,))
         u = await cur.fetchone()
@@ -217,7 +238,7 @@ async def send_profile(user_id: int, to_user: int):
     if not u:
         return
 
-    role, goal, city, about = u
+    role, goal, city, about, photo_id = u
     text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -227,48 +248,27 @@ async def send_profile(user_id: int, to_user: int):
         ]
     ])
 
-    await bot.send_message(to_user, text, reply_markup=kb)
+    if photo_id:
+        await bot.send_photo(to_user, photo_id, caption=text, reply_markup=kb)
+    else:
+        await bot.send_message(to_user, text, reply_markup=kb)
 
 
-# ---------- SMART BROWSE ----------
+# ---------- BROWSE ----------
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery):
     me = call.from_user.id
 
     async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT city, goal FROM users WHERE user_id=?",
-            (me,)
-        )
-        my = await cur.fetchone()
-        if not my:
-            await call.message.answer("Сначала создайте анкету 🤍")
-            return
-
-        city, goal = my
-
         cur = await db.execute("""
         SELECT user_id FROM users
         WHERE user_id != ?
-          AND city = ?
-          AND goal = ?
           AND user_id NOT IN (
               SELECT to_user FROM likes WHERE from_user=?
           )
         ORDER BY RANDOM() LIMIT 1
-        """, (me, city, goal, me))
+        """, (me, me))
         row = await cur.fetchone()
-
-        if not row:
-            cur = await db.execute("""
-            SELECT user_id FROM users
-            WHERE user_id != ?
-              AND user_id NOT IN (
-                  SELECT to_user FROM likes WHERE from_user=?
-              )
-            ORDER BY RANDOM() LIMIT 1
-            """, (me, me))
-            row = await cur.fetchone()
 
     if not row:
         await waiting_screen(me)
@@ -277,14 +277,12 @@ async def browse(call: CallbackQuery):
     await send_profile(row[0], me)
 
 
-# ---------- SKIP ----------
+# ---------- LIKE / SKIP ----------
 @dp.callback_query(F.data.startswith("skip_"))
 async def skip(call: CallbackQuery):
-    await call.answer()
     await browse(call)
 
 
-# ---------- LIKE ----------
 @dp.callback_query(F.data.startswith("like_"))
 async def like(call: CallbackQuery):
     from_user = call.from_user.id
@@ -300,29 +298,18 @@ async def like(call: CallbackQuery):
             "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
             (to_user, from_user)
         )
-        mutual = await cur.fetchone()
-
-        if mutual:
-            await db.execute(
-                "INSERT OR IGNORE INTO matches VALUES (?, ?)",
-                (min(from_user, to_user), max(from_user, to_user))
-            )
-
+        if await cur.fetchone():
             for a, b in [(from_user, to_user), (to_user, from_user)]:
                 await bot.send_message(
                     a,
                     "💫 У вас взаимная симпатия",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(
-                            text="💬 Написать",
-                            url=f"tg://user?id={b}"
-                        )]
+                        [InlineKeyboardButton(text="💬 Написать", url=f"tg://user?id={b}")]
                     ])
                 )
 
         await db.commit()
 
-    await call.answer("❤️")
     await browse(call)
 
 
