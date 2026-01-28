@@ -1,7 +1,7 @@
 import os
 import logging
 import psycopg2
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -121,6 +121,7 @@ async def handle_profile(update, context):
 # ================= PHOTO =================
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
+        await update.message.reply_text("Сейчас фото не требуется 🙂")
         return
 
     photo_id = update.message.photo[-1].file_id
@@ -195,14 +196,19 @@ async def like_profile(update, context):
     from_user = update.effective_user.id
     to_user = context.user_data.get("current_profile")
     if not to_user:
-        return await update.message.reply_text("Нет анкеты")
+        await update.message.reply_text("Нет анкеты")
+        return
 
     conn = get_connection()
     with conn.cursor() as c:
-        c.execute("INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
-                  (from_user, to_user))
-        c.execute("SELECT 1 FROM likes WHERE from_user=%s AND to_user=%s",
-                  (to_user, from_user))
+        c.execute(
+            "INSERT INTO likes VALUES (%s,%s) ON CONFLICT DO NOTHING",
+            (from_user, to_user)
+        )
+        c.execute(
+            "SELECT 1 FROM likes WHERE from_user=%s AND to_user=%s",
+            (to_user, from_user)
+        )
         match = c.fetchone()
         conn.commit()
     conn.close()
@@ -224,7 +230,8 @@ async def my_profile(update, context):
     conn.close()
 
     if not p:
-        return await update.message.reply_text("Анкета не найдена")
+        await update.message.reply_text("Анкета не найдена")
+        return
 
     gender, age, city, looking, about, photo_id = p
     await update.message.reply_photo(
@@ -247,7 +254,7 @@ async def router(update, context):
         await show_profile(update, context)
     elif text == "👤 Моя анкета":
         await my_profile(update, context)
-    elif context.user_data.get("step"):
+    elif context.user_data.get("step") and context.user_data.get("step") != "photo":
         await handle_profile(update, context)
 
 # ================= MAIN =================
