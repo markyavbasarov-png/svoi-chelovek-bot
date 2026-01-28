@@ -255,18 +255,22 @@ async def check_again(message: Message, state: FSMContext):
     await show_profile(message, state)
 
 # ======================= LIKE =======================
-
 @dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
 async def like_profile(message: Message, state: FSMContext):
     data = await state.get_data()
-    target = data["current_profile"]
+    target = data.get("current_profile")
+
+    if not target:
+        return await show_profile(message, state)
 
     async with aiosqlite.connect(DB_NAME) as db:
+        # сохраняем лайк
         await db.execute(
-            "INSERT OR IGNORE INTO likes VALUES (?, ?)",
+            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (message.from_user.id, target)
         )
 
+        # проверяем взаимность
         mutual = await db.execute_fetchone(
             "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
             (target, message.from_user.id)
@@ -274,10 +278,44 @@ async def like_profile(message: Message, state: FSMContext):
         await db.commit()
 
     if mutual:
-        await message.answer("Кажется, это взаимно 💫")
+        # кнопка написать
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💬 Написать",
+                    url=f"https://t.me/user?id={message.from_user.id}"
+                )]
+            ]
+        )
+
+        # сообщение второму человеку
+        await bot.send_message(
+            target,
+            "💫 Взаимная симпатия!\n\n"
+            "Кажется, вы понравились друг другу 🤍\n"
+            "Самое время написать!",
+            reply_markup=kb
+        )
+
+        # сообщение текущему пользователю
+        kb2 = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💬 Написать",
+                    url=f"https://t.me/user?id={target}"
+                )]
+            ]
+        )
+
+        await message.answer(
+            "💫 Это взаимно!\n\n"
+            "Вы понравились друг другу 🤍",
+            reply_markup=kb2
+        )
+    else:
+        await message.answer("❤️ Принято. Смотрим дальше…")
 
     await show_profile(message, state)
-
 # ======================= SKIP =======================
 
 @dp.message(Browse.SHOW_PROFILE, F.text.in_(["➡️ Дальше", "🚫 Не моё"]))
