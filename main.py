@@ -126,15 +126,19 @@ async def handle_profile(update, context):
         return
 
 # ================= PHOTO HANDLER =================
-async def handle_photo(update, context):
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
         return
 
-    if not update.message.photo:
-        await update.message.reply_text("❌ Это не фото. Пришли фото 📸")
+    # Фото может прийти как photo ИЛИ document
+    if update.message.photo:
+        file_id = update.message.photo[-1].file_id
+    elif update.message.document and update.message.document.mime_type.startswith("image/"):
+        file_id = update.message.document.file_id
+    else:
+        await update.message.reply_text("❌ Пришли именно фото 📸")
         return
 
-    photo_id = update.message.photo[-1].file_id
     user_id = update.effective_user.id
 
     conn = get_connection()
@@ -156,14 +160,14 @@ async def handle_photo(update, context):
             context.user_data["city"],
             context.user_data["looking"],
             context.user_data["about"],
-            photo_id
+            file_id
         ))
         conn.commit()
     conn.close()
 
     context.user_data.clear()
 
-    await update.message.reply_text("💖 Анкета сохранена!")
+    await update.message.reply_text("💖 Анкета сохранена!", reply_markup=main_keyboard)
     await my_profile(update, context)
 
 # ================= SHOW PROFILES =================
