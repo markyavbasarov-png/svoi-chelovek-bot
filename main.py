@@ -216,15 +216,18 @@ async def confirm_profile(message: Message, state: FSMContext):
     await show_profile(message, state)
 
 # ======================= BROWSING =======================
-
 async def show_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
         candidates = await db.execute_fetchall("""
-        SELECT * FROM users
-        WHERE user_id != ?
-        AND user_id NOT IN (SELECT to_user FROM likes WHERE from_user=?)
-        AND user_id NOT IN (SELECT to_user FROM skips WHERE from_user=?)
-        """, (message.from_user.id, message.from_user.id, message.from_user.id))
+            SELECT * FROM users
+            WHERE user_id != ?
+            AND user_id NOT IN (
+                SELECT to_user FROM skips WHERE from_user=?
+            )
+        """, (
+            message.from_user.id,
+            message.from_user.id
+        ))
 
     if not candidates:
         return await message.answer(
@@ -245,7 +248,6 @@ async def show_profile(message: Message, state: FSMContext):
     )
 
     await message.answer(text, reply_markup=browse_kb)
-
 # ======================= CHECK AGAIN =======================
 
 @dp.message(F.text == "🔄 Проверить позже")
@@ -261,13 +263,11 @@ async def like_profile(message: Message, state: FSMContext):
     target = data["current_profile"]
 
     async with aiosqlite.connect(DB_NAME) as db:
-        # сохраняем лайк
         await db.execute(
             "INSERT OR IGNORE INTO likes VALUES (?, ?)",
             (message.from_user.id, target)
         )
 
-        # проверяем взаимность
         mutual = await db.execute_fetchone(
             "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
             (target, message.from_user.id)
@@ -279,24 +279,22 @@ async def like_profile(message: Message, state: FSMContext):
         link_for_me = InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(
                 text="💬 Написать",
-                url=f"https://t.me/user?id={target}"
+                url=f"tg://user?id={target}"
             )]]
         )
 
         link_for_target = InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(
                 text="💬 Написать",
-                url=f"https://t.me/user?id={message.from_user.id}"
+                url=f"tg://user?id={message.from_user.id}"
             )]]
         )
 
-        # сообщение текущему пользователю
         await message.answer(
             "💫 Это взаимно!\nМожете написать друг другу 🤍",
             reply_markup=link_for_me
         )
 
-        # сообщение второму пользователю
         await bot.send_message(
             target,
             "💫 У вас взаимная симпатия!\nКто-то лайкнул вас в ответ 🤍",
@@ -304,7 +302,6 @@ async def like_profile(message: Message, state: FSMContext):
         )
 
     await show_profile(message, state)
-                    
 # ======================= SKIP =======================
 
 @dp.message(Browse.SHOW_PROFILE, F.text.in_(["➡️ Дальше", "🚫 Не моё"]))
