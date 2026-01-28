@@ -1,26 +1,28 @@
 import logging
+import os
 import sqlite3
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 # ================== НАСТРОЙКИ ==================
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_NAME = "profiles.db"
+
+if not BOT_TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не найден в переменных окружения")
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
+
+logger = logging.getLogger(__name__)
 
 # ================== БАЗА ДАННЫХ ==================
 def init_db():
@@ -29,11 +31,12 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER PRIMARY KEY,
-            photo_id TEXT
+            photo_id TEXT NOT NULL
         )
     """)
     conn.commit()
     conn.close()
+    logger.info("База данных инициализирована")
 
 # ================== КЛАВИАТУРА ==================
 main_keyboard = ReplyKeyboardMarkup(
@@ -41,29 +44,27 @@ main_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton("🔍 Смотреть анкеты")],
         [KeyboardButton("❤️ Совпадения")],
         [KeyboardButton("👤 Моя анкета")],
-        [KeyboardButton("➕ Создать анкету")]
+        [KeyboardButton("➕ Создать анкету")],
     ],
-    resize_keyboard=True
+    resize_keyboard=True,
 )
 
 # ================== ХЕНДЛЕРЫ ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💖 Добро пожаловать в «СвойЧеловек»!\n\n"
-        "Нажми «Создать анкету», чтобы начать 👇",
-        reply_markup=main_keyboard
+        "Нажми «➕ Создать анкету», чтобы начать 👇",
+        reply_markup=main_keyboard,
     )
 
 async def create_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text(
-        "📸 Пришли одно фото"
-    )
+    await update.message.reply_text("📸 Пришли одно фото")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = update.effective_user.id
+    user_id = update.effective_user.id
 
+    try:
         if not update.message.photo:
             await update.message.reply_text("❌ Фото не получено. Попробуй ещё раз.")
             return
@@ -72,23 +73,24 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-
         c.execute("""
             INSERT INTO profiles (user_id, photo_id)
             VALUES (?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET photo_id=excluded.photo_id
+            ON CONFLICT(user_id)
+            DO UPDATE SET photo_id = excluded.photo_id
         """, (user_id, photo_id))
-
         conn.commit()
         conn.close()
 
+        logger.info(f"Анкета сохранена: user_id={user_id}")
+
         await update.message.reply_text(
             "✅ Анкета сохранена!",
-            reply_markup=main_keyboard
+            reply_markup=main_keyboard,
         )
 
-    except Exception as e:
-        logging.exception("Ошибка при сохранении анкеты")
+    except Exception:
+        logger.exception("Ошибка при сохранении анкеты")
         await update.message.reply_text(
             "❌ Ошибка при сохранении анкеты.\n"
             "Нажми «Создать анкету» и попробуй ещё раз."
@@ -112,22 +114,22 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_photo(
         photo=row[0],
         caption="👤 Твоя анкета",
-        reply_markup=main_keyboard
+        reply_markup=main_keyboard,
     )
 
 # ================== ЗАПУСК ==================
 def main():
     init_db()
 
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.Regex("^➕ Создать анкету$"), create_profile))
     app.add_handler(MessageHandler(filters.Regex("^👤 Моя анкета$"), my_profile))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    logging.info("🚀 Бот запущен")
-    app.run_polling()
+    logger.info("🚀 Бот успешно запущен")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
