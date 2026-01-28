@@ -112,11 +112,6 @@ browse_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-likes_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="👀 Кто-то лайкнул тебя")]],
-    resize_keyboard=True
-)
-
 # ======================= BOT =======================
 
 bot = Bot(BOT_TOKEN)
@@ -187,7 +182,7 @@ async def save_about(message: Message, state: FSMContext):
     await state.set_state(Profile.CONFIRM)
     await message.answer(
         f"{data['name']}, {data['age']}\n{data['city']}\n\n{data['about']}",
-        reply Assemblies=confirm_kb
+        reply_markup=confirm_kb
     )
 
 # ======================= CONFIRM =======================
@@ -198,8 +193,15 @@ async def confirm_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute(
             "INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (message.from_user.id, data["gender"], data["name"], data["age"],
-             data["city"], data["looking_for"], data["about"])
+            (
+                message.from_user.id,
+                data["gender"],
+                data["name"],
+                data["age"],
+                data["city"],
+                data["looking_for"],
+                data["about"],
+            ),
         )
         await db.commit()
 
@@ -211,11 +213,16 @@ async def confirm_profile(message: Message, state: FSMContext):
 
 async def show_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
-        candidates = await db.execute_fetchall("""
-        SELECT * FROM users
-        WHERE user_id != ?
-        AND user_id NOT IN (SELECT to_user FROM skips WHERE from_user=?)
-        """, (message.from_user.id, message.from_user.id))
+        candidates = await db.execute_fetchall(
+            """
+            SELECT * FROM users
+            WHERE user_id != ?
+            AND user_id NOT IN (
+                SELECT to_user FROM skips WHERE from_user=?
+            )
+            """,
+            (message.from_user.id, message.from_user.id),
+        )
 
     if not candidates:
         return await message.answer("Пока здесь тихо 🤍")
@@ -225,7 +232,7 @@ async def show_profile(message: Message, state: FSMContext):
 
     await message.answer(
         f"{profile[2]}, {profile[3]}\n{profile[4]}\n\n{profile[6]}",
-        reply_markup=browse_kb
+        reply_markup=browse_kb,
     )
 
 # ======================= LIKE =======================
@@ -233,74 +240,83 @@ async def show_profile(message: Message, state: FSMContext):
 @dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
 async def like_profile(message: Message, state: FSMContext):
     data = await state.get_data()
-    target = data["current_profile"]
+    target = data.get("current_profile")
+    if not target:
+        return await show_profile(message, state)
 
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("INSERT OR IGNORE INTO likes VALUES (?, ?)",
-                         (message.from_user.id, target))
+        await db.execute(
+            "INSERT OR IGNORE INTO likes VALUES (?, ?)",
+            (message.from_user.id, target),
+        )
         await db.commit()
 
-        mutual = await db.execute_fetchone("""
-        SELECT 1 FROM likes l1
-        JOIN likes l2
-        ON l1.from_user=l2.to_user AND l1.to_user=l2.from_user
-        WHERE l1.from_user=? AND l1.to_user=?
-        """, (message.from_user.id, target))
+        mutual = await db.execute_fetchone(
+            """
+            SELECT 1 FROM likes
+            WHERE from_user=? AND to_user=?
+            """,
+            (target, message.from_user.id),
+        )
 
+    # 🔔 УВЕДОМЛЕНИЕ О ЛАЙКЕ
     if not mutual:
         try:
-            await bot.send_message(
-                target,
-                "👀 Кажется, ты кому-то понравился(ась)",
-                reply_markup=likes_kb
-            )
+            await bot.send_message(target, "💌 Кто-то лайкнул тебя ❤️")
         except:
             pass
         return await show_profile(message, state)
 
-    await message.answer(
-        "💫 Это взаимно!",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"tg://user?id={target}"
-            )]]
-        )
+    # 💫 ВЗАИМНО
+    kb_me = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(
+            text="💬 Написать",
+            url=f"tg://user?id={target}"
+        )]]
     )
 
-    await bot.send_message(
-        target,
-        "💫 У вас взаимная симпатия!",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"tg://user?id={message.from_user.id}"
-            )]]
-        )
+    kb_target = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(
+            text="💬 Написать",
+            url=f"tg://user?id={message.from_user.id}"
+        )]]
     )
+
+    await message.answer(
+        "💫 Это взаимно!\nМожете написать друг другу 🤍",
+        reply_markup=kb_me
+    )
+
+    try:
+        await bot.send_message(
+            target,
+            "💫 У вас взаимная симпатия!\nМожно начинать общение 🤍",
+            reply_markup=kb_target
+        )
+    except:
+        pass
 
     await show_profile(message, state)
 
-# ======================= WHO LIKED YOU =======================
+# ======================= SKIP =======================
 
-@dp.message(F.text == "👀 Кто-то лайкнул тебя")
-async def someone_liked_you(message: Message, state: FSMContext):
+@dp.message(Browse.SHOW_PROFILE, F.text.in_(["➡️ Дальше", "🚫 Не моё"]))
+async def skip_profile(message: Message, state: FSMContext):
+    data = await state.get_data()
     async with aiosqlite.connect(DB_NAME) as db:
-        liker = await db.execute_fetchone("""
-        SELECT from_user FROM likes
-        WHERE to_user=?
-        AND from_user NOT IN (
-            SELECT to_user FROM likes WHERE from_user=?
+        await db.execute(
+            "INSERT OR IGNORE INTO skips VALUES (?, ?)",
+            (message.from_user.id, data.get("current_profile")),
         )
-        LIMIT 1
-        """, (message.from_user.id, message.from_user.id))
+        await db.commit()
 
-        if not liker:
-            return await message.answer("Пока нет новых лайков 🤍")
+    await show_profile(message, state)
 
-        profile = await db.execute_fetchone(
-            "SELECT * FROM users WHERE user_id=?",
-            (liker[0],)
-        )
+# ======================= RUN =======================
 
-    await state.set_state(Browse.SHOW_PROFILE
+async def main():
+    await init_db()
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
