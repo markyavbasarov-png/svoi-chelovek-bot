@@ -161,14 +161,14 @@ async def about_entered(message: Message, state: FSMContext):
     )
 
 
-# ---------- SEND PROFILE (ОДНА КНОПКА) ----------
+# ---------- SEND PROFILE ----------
 async def send_profile(user_id: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
-        cursor = await db.execute("""
+        cur = await db.execute("""
         SELECT role, goal, city, about
         FROM users WHERE user_id=?
         """, (user_id,))
-        u = await cursor.fetchone()
+        u = await cur.fetchone()
 
     if not u:
         return
@@ -177,7 +177,10 @@ async def send_profile(user_id: int, to_user: int):
     text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Нравится", callback_data=f"like_{user_id}")]
+        [
+            InlineKeyboardButton(text="👎", callback_data=f"skip_{user_id}"),
+            InlineKeyboardButton(text="❤️", callback_data=f"like_{user_id}")
+        ]
     ])
 
     await bot.send_message(to_user, text, reply_markup=kb)
@@ -230,7 +233,14 @@ async def browse(call: CallbackQuery):
     await send_profile(row[0], me)
 
 
-# ---------- LIKE = СВАЙП ----------
+# ---------- SKIP ----------
+@dp.callback_query(F.data.startswith("skip_"))
+async def skip(call: CallbackQuery):
+    await call.answer("👋")
+    await browse(call)
+
+
+# ---------- LIKE ----------
 @dp.callback_query(F.data.startswith("like_"))
 async def like(call: CallbackQuery):
     from_user = call.from_user.id
@@ -265,14 +275,11 @@ async def like(call: CallbackQuery):
                         )]
                     ])
                 )
-        else:
-            # входящий лайк = анкета
-            await send_profile(from_user, to_user)
 
         await db.commit()
 
     await call.answer("❤️")
-    await browse(call)  # ← СВАЙП ВПЕРЁД
+    await browse(call)
 
 
 # ---------- RUN ----------
