@@ -267,39 +267,47 @@ async def like_profile(message: Message, state: FSMContext):
             "INSERT OR IGNORE INTO likes VALUES (?, ?)",
             (message.from_user.id, target)
         )
-
-        mutual = await db.execute_fetchone(
-            "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
-            (target, message.from_user.id)
-        )
-
         await db.commit()
 
-    if mutual:
-        link_for_me = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"tg://user?id={target}"
-            )]]
-        )
+        mutual = await db.execute_fetchone("""
+        SELECT 1
+        FROM likes l1
+        JOIN likes l2
+        ON l1.from_user = l2.to_user
+        AND l1.to_user = l2.from_user
+        WHERE l1.from_user = ?
+        AND l1.to_user = ?
+        """, (message.from_user.id, target))
 
-        link_for_target = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"tg://user?id={message.from_user.id}"
-            )]]
-        )
+    if not mutual:
+        await show_profile(message, state)
+        return
 
-        await message.answer(
-            "💫 Это взаимно!\nМожете написать друг другу 🤍",
-            reply_markup=link_for_me
-        )
+    # 🔔 УВЕДОМЛЕНИЯ
+    kb_me = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(
+            text="💬 Написать",
+            url=f"tg://user?id={target}"
+        )]]
+    )
 
-        await bot.send_message(
-            target,
-            "💫 У вас взаимная симпатия!\nКто-то лайкнул вас в ответ 🤍",
-            reply_markup=link_for_target
-        )
+    kb_target = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(
+            text="💬 Написать",
+            url=f"tg://user?id={message.from_user.id}"
+        )]]
+    )
+
+    await message.answer(
+        "💫 Это взаимно!\nМожете написать друг другу 🤍",
+        reply_markup=kb_me
+    )
+
+    await bot.send_message(
+        target,
+        "💫 У вас взаимная симпатия!\nМожно начинать общение 🤍",
+        reply_markup=kb_target
+    )
 
     await show_profile(message, state)
 # ======================= SKIP =======================
