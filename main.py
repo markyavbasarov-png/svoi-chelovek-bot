@@ -1,44 +1,41 @@
 import asyncio
 import logging
-import os
-import random
+import aiosqlite
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
+    CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
 from aiogram.filters import CommandStart
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
 
-import aiosqlite
+import os
+TOKEN = os.getenv("BOT_TOKEN")
 
-# ======================= CONFIG =======================
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN not set")
-
-DB_NAME = "dating.db"
 logging.basicConfig(level=logging.INFO)
+bot = Bot(TOKEN)
+dp = Dispatcher()
 
-# ======================= DB =======================
+DB = "db.sqlite3"
 
+
+# ---------- DATABASE ----------
 async def init_db():
-    async with aiosqlite.connect(DB_NAME) as db:
+    async with aiosqlite.connect(DB) as db:
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            gender TEXT,
-            name TEXT,
-            age INTEGER,
+            username TEXT,
+            role TEXT,
+            goal TEXT,
+            child_age TEXT,
             city TEXT,
-            looking_for TEXT,
-            about TEXT
+            about TEXT,
+            active INTEGER DEFAULT 1
         )
         """)
         await db.execute("""
@@ -49,271 +46,222 @@ async def init_db():
         )
         """)
         await db.execute("""
-        CREATE TABLE IF NOT EXISTS skips (
-            from_user INTEGER,
-            to_user INTEGER,
-            UNIQUE(from_user, to_user)
+        CREATE TABLE IF NOT EXISTS matches (
+            user1 INTEGER,
+            user2 INTEGER,
+            UNIQUE(user1, user2)
         )
         """)
         await db.commit()
 
-# ======================= FSM =======================
 
+# ---------- FSM ----------
 class Profile(StatesGroup):
-    ASK_GENDER = State()
-    ASK_NAME = State()
-    ASK_AGE = State()
-    ASK_CITY = State()
-    ASK_LOOKING_FOR = State()
-    ASK_ABOUT = State()
-    CONFIRM = State()
+    role = State()
+    goal = State()
+    child_age = State()
+    city = State()
+    about = State()
 
-class Browse(StatesGroup):
-    SHOW_PROFILE = State()
 
-# ======================= KEYBOARDS =======================
-
-start_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Давай 😏")]],
-    resize_keyboard=True
-)
-
-gender_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="👨 Мужчина"), KeyboardButton(text="👩 Женщина")]],
-    resize_keyboard=True
-)
-
-looking_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="💙 Мужчину"), KeyboardButton(text="💗 Женщину")],
-        [KeyboardButton(text="🤍 Не важно")]
-    ],
-    resize_keyboard=True
-)
-
-about_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="➖ Пропустить")]],
-    resize_keyboard=True
-)
-
-confirm_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="✅ Всё верно")],
-        [KeyboardButton(text="✏️ Изменить")]
-    ],
-    resize_keyboard=True
-)
-
-browse_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="❤️ Нравится"), KeyboardButton(text="➡️ Дальше")],
-        [KeyboardButton(text="🚫 Не моё")]
-    ],
-    resize_keyboard=True
-)
-
-# ======================= BOT =======================
-
-bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
-
-# ======================= START =======================
-
+# ---------- START ----------
 @dp.message(CommandStart())
 async def start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Привет 🤍\n\nЭтот бот поможет найти своего человека.\n\nНачнём?",
-        reply_markup=start_kb
+        "Привет 🤍\n\n"
+        "Этот бот создан для родителей и тех, кому сейчас нужна поддержка.\n"
+        "Здесь можно найти компанию для прогулок с детьми или тёплое общение — "
+        "без спешки и без давления.\n\n"
+        "Давайте познакомимся немного 🌱",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Начать", callback_data="start_form")]
+        ])
     )
 
-@dp.message(F.text == "Давай 😏")
-async def begin_profile(message: Message, state: FSMContext):
-    await state.set_state(Profile.ASK_GENDER)
-    await message.answer("Кто ты?", reply_markup=gender_kb)
 
-# ======================= PROFILE =======================
+# ---------- PROFILE ----------
+@dp.callback_query(F.data == "start_form")
+async def start_form(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.role)
+    await call.message.edit_text(
+        "Кто вы?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👩‍🍼 Мама", callback_data="role_Мама")],
+            [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
+            [InlineKeyboardButton(text="🤍 Будущий родитель", callback_data="role_Будущий родитель")],
+            [InlineKeyboardButton(text="🌱 Просто ищу поддержку", callback_data="role_Поддержка")]
+        ])
+    )
 
-@dp.message(Profile.ASK_GENDER)
-async def save_gender(message: Message, state: FSMContext):
-    gender = "male" if "Мужчина" in message.text else "female"
-    await state.update_data(gender=gender)
-    await state.set_state(Profile.ASK_NAME)
-    await message.answer("Как тебя зовут?")
 
-@dp.message(Profile.ASK_NAME)
-async def save_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text.strip())
-    await state.set_state(Profile.ASK_AGE)
-    await message.answer("Сколько тебе лет?")
+@dp.callback_query(Profile.role)
+async def role_chosen(call: CallbackQuery, state: FSMContext):
+    await state.update_data(role=call.data.replace("role_", ""))
+    await state.set_state(Profile.goal)
+    await call.message.edit_text(
+        "Что для вас сейчас важнее всего?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🚶‍♀️ Совместные прогулки с детьми", callback_data="goal_Прогулки")],
+            [InlineKeyboardButton(text="💬 Общение и поддержка", callback_data="goal_Поддержка")],
+            [InlineKeyboardButton(text="🎀 Поддержка в важный период", callback_data="goal_Период")],
+            [InlineKeyboardButton(text="🤝 Всё вместе, без спешки", callback_data="goal_Всё")]
+        ])
+    )
 
-@dp.message(Profile.ASK_AGE)
-async def save_age(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        return await message.answer("Напиши число 🙂")
-    await state.update_data(age=int(message.text))
-    await state.set_state(Profile.ASK_CITY)
-    await message.answer("Из какого ты города?")
 
-@dp.message(Profile.ASK_CITY)
-async def save_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text.strip())
-    await state.set_state(Profile.ASK_LOOKING_FOR)
-    await message.answer("Кого ты ищешь?", reply_markup=looking_kb)
+@dp.callback_query(Profile.goal)
+async def goal_chosen(call: CallbackQuery, state: FSMContext):
+    await state.update_data(goal=call.data.replace("goal_", ""))
+    await state.set_state(Profile.child_age)
+    await call.message.edit_text(
+        "Если хотите, укажите возраст ребёнка.\nМожно пропустить.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤰 Ещё ждём", callback_data="age_Ещё ждём")],
+            [InlineKeyboardButton(text="👶 0–1 год", callback_data="age_0–1")],
+            [InlineKeyboardButton(text="🧸 1–3 года", callback_data="age_1–3")],
+            [InlineKeyboardButton(text="🏃‍♂️ 3–6 лет", callback_data="age_3–6")],
+            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="age_Пропустить")]
+        ])
+    )
 
-@dp.message(Profile.ASK_LOOKING_FOR)
-async def save_looking(message: Message, state: FSMContext):
-    if "Мужчину" in message.text:
-        lf = "male"
-    elif "Женщину" in message.text:
-        lf = "female"
-    else:
-        lf = "any"
-    await state.update_data(looking_for=lf)
-    await state.set_state(Profile.ASK_ABOUT)
-    await message.answer("Напиши пару слов о себе 🤍", reply_markup=about_kb)
 
-@dp.message(Profile.ASK_ABOUT)
-async def save_about(message: Message, state: FSMContext):
-    about = "" if "Пропустить" in message.text else message.text
-    await state.update_data(about=about)
+@dp.callback_query(Profile.child_age)
+async def age_chosen(call: CallbackQuery, state: FSMContext):
+    age = call.data.replace("age_", "")
+    await state.update_data(child_age=None if age == "Пропустить" else age)
+    await state.set_state(Profile.city)
+    await call.message.edit_text("В каком городе вы находитесь?")
 
-    data = await state.get_data()
-    await state.set_state(Profile.CONFIRM)
+
+@dp.message(Profile.city)
+async def city_entered(message: Message, state: FSMContext):
+    await state.update_data(city=message.text)
+    await state.set_state(Profile.about)
     await message.answer(
-        f"{data['name']}, {data['age']}\n{data['city']}\n\n{data['about']}",
-        reply_markup=confirm_kb
+        "Если хотите, напишите пару слов о себе.\n"
+        "Или отправьте «Пропустить»."
     )
 
-# ======================= CONFIRM =======================
 
-@dp.message(Profile.CONFIRM, F.text == "✅ Всё верно")
-async def confirm_profile(message: Message, state: FSMContext):
+@dp.message(Profile.about)
+async def about_entered(message: Message, state: FSMContext):
     data = await state.get_data()
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                message.from_user.id,
-                data["gender"],
-                data["name"],
-                data["age"],
-                data["city"],
-                data["looking_for"],
-                data["about"],
-            ),
-        )
+    about = None if message.text.lower() == "пропустить" else message.text
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("""
+        INSERT OR REPLACE INTO users
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (
+            message.from_user.id,
+            message.from_user.username,
+            data["role"],
+            data["goal"],
+            data["child_age"],
+            data["city"],
+            about
+        ))
         await db.commit()
 
-    await state.set_state(Browse.SHOW_PROFILE)
-    await message.answer("Отлично 🤍", reply_markup=browse_kb)
-    await show_profile(message, state)
-
-# ======================= BROWSING =======================
-
-async def show_profile(message: Message, state: FSMContext):
-    async with aiosqlite.connect(DB_NAME) as db:
-        candidates = await db.execute_fetchall(
-            """
-            SELECT * FROM users
-            WHERE user_id != ?
-            AND user_id NOT IN (
-                SELECT to_user FROM skips WHERE from_user=?
-            )
-            """,
-            (message.from_user.id, message.from_user.id),
-        )
-
-    if not candidates:
-        return await message.answer("Пока здесь тихо 🤍")
-
-    profile = random.choice(candidates)
-    await state.update_data(current_profile=profile[0])
-
+    await state.clear()
     await message.answer(
-        f"{profile[2]}, {profile[3]}\n{profile[4]}\n\n{profile[6]}",
-        reply_markup=browse_kb,
+        "Спасибо 🤍 Ваша анкета создана.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
+        ])
     )
 
-# ======================= LIKE =======================
 
-@dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
-async def like_profile(message: Message, state: FSMContext):
-    data = await state.get_data()
-    target = data.get("current_profile")
-    if not target:
-        return await show_profile(message, state)
+# ---------- BROWSING ----------
+@dp.callback_query(F.data == "browse")
+async def browse(call: CallbackQuery):
+    async with aiosqlite.connect(DB) as db:
+        cursor = await db.execute("""
+        SELECT user_id, role, goal, child_age, city, about
+        FROM users
+        WHERE user_id != ?
+        ORDER BY RANDOM()
+        LIMIT 1
+        """, (call.from_user.id,))
+        user = await cursor.fetchone()
 
-    async with aiosqlite.connect(DB_NAME) as db:
+    if not user:
+        await call.message.answer("Пока анкет нет 🤍")
+        return
+
+    uid, role, goal, child_age, city, about = user
+    text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
+
+    await call.message.answer(
+        text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💚 Лайк", callback_data=f"like_{uid}"),
+                InlineKeyboardButton(text="⏭ Дальше", callback_data="browse")
+            ]
+        ])
+    )
+
+
+# ---------- LIKE + MATCH ----------
+@dp.callback_query(F.data.startswith("like_"))
+async def like(call: CallbackQuery):
+    from_user = call.from_user.id
+    to_user = int(call.data.split("_")[1])
+
+    async with aiosqlite.connect(DB) as db:
         await db.execute(
             "INSERT OR IGNORE INTO likes VALUES (?, ?)",
-            (message.from_user.id, target),
+            (from_user, to_user)
         )
+
+        cursor = await db.execute(
+            "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
+            (to_user, from_user)
+        )
+        mutual = await cursor.fetchone()
+
+        if not mutual:
+            await bot.send_message(
+                to_user,
+                "💚 Кто-то лайкнул вас 🤍"
+            )
+        else:
+            await db.execute(
+                "INSERT OR IGNORE INTO matches VALUES (?, ?)",
+                (min(from_user, to_user), max(from_user, to_user))
+            )
+
+            await bot.send_message(
+                from_user,
+                "💫 Это взаимно!\nВы можете написать первым 💌",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="💌 Написать первым",
+                        url=f"tg://user?id={to_user}"
+                    )]
+                ])
+            )
+
+            await bot.send_message(
+                to_user,
+                "💫 У вас взаимная симпатия 🤍",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="💬 Написать",
+                        url=f"tg://user?id={from_user}"
+                    )]
+                ])
+            )
+
         await db.commit()
 
-        mutual = await db.execute_fetchone(
-            """
-            SELECT 1 FROM likes
-            WHERE from_user=? AND to_user=?
-            """,
-            (target, message.from_user.id),
-        )
+    await call.answer("Готово 🤍")
+    await browse(call)
 
-    # 🔔 УВЕДОМЛЕНИЕ О ЛАЙКЕ
-    if not mutual:
-        try:
-            await bot.send_message(target, "💌 Кто-то лайкнул тебя ❤️")
-        except:
-            pass
-        return await show_profile(message, state)
 
-    # 💫 ВЗАИМНО
-    kb_me = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(
-            text="💬 Написать",
-            url=f"tg://user?id={target}"
-        )]]
-    )
-
-    kb_target = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(
-            text="💬 Написать",
-            url=f"tg://user?id={message.from_user.id}"
-        )]]
-    )
-
-    await message.answer(
-        "💫 Это взаимно!\nМожете написать друг другу 🤍",
-        reply_markup=kb_me
-    )
-
-    try:
-        await bot.send_message(
-            target,
-            "💫 У вас взаимная симпатия!\nМожно начинать общение 🤍",
-            reply_markup=kb_target
-        )
-    except:
-        pass
-
-    await show_profile(message, state)
-
-# ======================= SKIP =======================
-
-@dp.message(Browse.SHOW_PROFILE, F.text.in_(["➡️ Дальше", "🚫 Не моё"]))
-async def skip_profile(message: Message, state: FSMContext):
-    data = await state.get_data()
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO skips VALUES (?, ?)",
-            (message.from_user.id, data.get("current_profile")),
-        )
-        await db.commit()
-
-    await show_profile(message, state)
-
-# ======================= RUN =======================
-
+# ---------- RUN ----------
 async def main():
     await init_db()
     await dp.start_polling(bot)
