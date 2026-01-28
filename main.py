@@ -129,13 +129,45 @@ async def age_chosen(call: CallbackQuery, state: FSMContext):
 async def city_entered(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Profile.about)
-    await message.answer("Пару слов о себе или «Пропустить»")
+    await message.answer(
+        "Пару слов о себе",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⏭ Пропустить", callback_data="about_skip")]
+        ])
+    )
+
+
+@dp.callback_query(F.data == "about_skip", Profile.about)
+async def about_skipped(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("""
+        INSERT OR REPLACE INTO users
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            call.from_user.id,
+            call.from_user.username,
+            data["role"],
+            data["goal"],
+            data["child_age"],
+            data["city"],
+            None
+        ))
+        await db.commit()
+
+    await state.clear()
+    await call.message.edit_text(
+        "🤍 Анкета создана",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
+        ])
+    )
 
 
 @dp.message(Profile.about)
 async def about_entered(message: Message, state: FSMContext):
     data = await state.get_data()
-    about = None if message.text.lower() == "пропустить" else message.text
 
     async with aiosqlite.connect(DB) as db:
         await db.execute("""
@@ -148,7 +180,7 @@ async def about_entered(message: Message, state: FSMContext):
             data["goal"],
             data["child_age"],
             data["city"],
-            about
+            message.text
         ))
         await db.commit()
 
