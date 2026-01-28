@@ -174,10 +174,7 @@ async def save_looking(message: Message, state: FSMContext):
         lf = "any"
     await state.update_data(looking_for=lf)
     await state.set_state(Profile.ASK_ABOUT)
-    await message.answer(
-        "Хочешь — напиши пару слов о себе 🤍",
-        reply_markup=about_kb
-    )
+    await message.answer("Хочешь — напиши пару слов о себе 🤍", reply_markup=about_kb)
 
 @dp.message(Profile.ASK_ABOUT)
 async def save_about(message: Message, state: FSMContext):
@@ -202,7 +199,6 @@ async def confirm_profile(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
         INSERT OR REPLACE INTO users
-        (user_id, gender, name, age, city, looking_for, about)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             message.from_user.id,
@@ -250,6 +246,14 @@ async def show_profile(message: Message, state: FSMContext):
 
     await message.answer(text, reply_markup=browse_kb)
 
+# ======================= CHECK AGAIN =======================
+
+@dp.message(F.text == "🔄 Проверить позже")
+async def check_again(message: Message, state: FSMContext):
+    await state.set_state(Browse.SHOW_PROFILE)
+    await message.answer("Секундочку… смотрю, кто появился 👀")
+    await show_profile(message, state)
+
 # ======================= LIKE =======================
 
 @dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
@@ -270,16 +274,7 @@ async def like_profile(message: Message, state: FSMContext):
         await db.commit()
 
     if mutual:
-        link = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(
-                text="💬 Написать",
-                url=f"https://t.me/user?id={target}"
-            )]]
-        )
-        await message.answer(
-            "Кажется, это взаимно 💫\nМожете написать друг другу 🤍",
-            reply_markup=link
-        )
+        await message.answer("Кажется, это взаимно 💫")
 
     await show_profile(message, state)
 
