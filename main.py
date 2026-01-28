@@ -258,15 +258,12 @@ async def check_again(message: Message, state: FSMContext):
 @dp.message(Browse.SHOW_PROFILE, F.text == "❤️ Нравится")
 async def like_profile(message: Message, state: FSMContext):
     data = await state.get_data()
-    target = data.get("current_profile")
-
-    if not target:
-        return await show_profile(message, state)
+    target = data["current_profile"]
 
     async with aiosqlite.connect(DB_NAME) as db:
         # сохраняем лайк
         await db.execute(
-            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO likes VALUES (?, ?)",
             (message.from_user.id, target)
         )
 
@@ -275,47 +272,39 @@ async def like_profile(message: Message, state: FSMContext):
             "SELECT 1 FROM likes WHERE from_user=? AND to_user=?",
             (target, message.from_user.id)
         )
+
         await db.commit()
 
     if mutual:
-        # кнопка написать
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="💬 Написать",
-                    url=f"https://t.me/user?id={message.from_user.id}"
-                )]
-            ]
+        link_for_me = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(
+                text="💬 Написать",
+                url=f"https://t.me/user?id={target}"
+            )]]
         )
 
-        # сообщение второму человеку
-        await bot.send_message(
-            target,
-            "💫 Взаимная симпатия!\n\n"
-            "Кажется, вы понравились друг другу 🤍\n"
-            "Самое время написать!",
-            reply_markup=kb
+        link_for_target = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(
+                text="💬 Написать",
+                url=f"https://t.me/user?id={message.from_user.id}"
+            )]]
         )
 
         # сообщение текущему пользователю
-        kb2 = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="💬 Написать",
-                    url=f"https://t.me/user?id={target}"
-                )]
-            ]
+        await message.answer(
+            "💫 Это взаимно!\nМожете написать друг другу 🤍",
+            reply_markup=link_for_me
         )
 
-        await message.answer(
-            "💫 Это взаимно!\n\n"
-            "Вы понравились друг другу 🤍",
-            reply_markup=kb2
+        # сообщение второму пользователю
+        await bot.send_message(
+            target,
+            "💫 У вас взаимная симпатия!\nКто-то лайкнул вас в ответ 🤍",
+            reply_markup=link_for_target
         )
-    else:
-        await message.answer("❤️ Принято. Смотрим дальше…")
 
     await show_profile(message, state)
+                    
 # ======================= SKIP =======================
 
 @dp.message(Browse.SHOW_PROFILE, F.text.in_(["➡️ Дальше", "🚫 Не моё"]))
