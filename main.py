@@ -161,6 +161,18 @@ async def about_entered(message: Message, state: FSMContext):
     )
 
 
+# ---------- WAITING SCREEN ----------
+async def waiting_screen(user_id: int):
+    await bot.send_message(
+        user_id,
+        "🤍 Анкеты закончились\n\n"
+        "Мы подберём новых людей и сразу покажем тебе 🌱",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Проверить позже", callback_data="browse")]
+        ])
+    )
+
+
 # ---------- SEND PROFILE ----------
 async def send_profile(user_id: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
@@ -175,13 +187,13 @@ async def send_profile(user_id: int, to_user: int):
 
     role, goal, city, about = u
     text = f"{role}\n📍 {city}\nИщу: {goal}\n\n{about or ''}"
-kb = InlineKeyboardMarkup(inline_keyboard=[
-    [
-        InlineKeyboardButton(text="♥️", callback_data=f"like_{user_id}"),
-        InlineKeyboardButton(text="❌", callback_data=f"skip_{user_id}")
-    ]
-])
-    
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="❤️", callback_data=f"like_{user_id}"),
+            InlineKeyboardButton(text="👎", callback_data=f"skip_{user_id}")
+        ]
+    ])
 
     await bot.send_message(to_user, text, reply_markup=kb)
 
@@ -227,7 +239,7 @@ async def browse(call: CallbackQuery):
             row = await cur.fetchone()
 
     if not row:
-        await call.message.answer("Пока подходящих анкет нет 🤍")
+        await waiting_screen(me)
         return
 
     await send_profile(row[0], me)
@@ -236,7 +248,7 @@ async def browse(call: CallbackQuery):
 # ---------- SKIP ----------
 @dp.callback_query(F.data.startswith("skip_"))
 async def skip(call: CallbackQuery):
-    await call.answer("👋")
+    await call.answer()
     await browse(call)
 
 
