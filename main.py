@@ -121,7 +121,6 @@ async def handle_profile(update, context):
 # ================= PHOTO =================
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "photo":
-        await update.message.reply_text("Сейчас фото не требуется 🙂")
         return
 
     photo_id = update.message.photo[-1].file_id
@@ -152,8 +151,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     context.user_data.clear()
+
     await update.message.reply_text(
-        "💖 Анкета сохранена!",
+        "🎉 Анкета создана!\n"
+        "Нажми «Смотреть анкеты» 💕",
         reply_markup=main_keyboard
     )
 
@@ -170,7 +171,8 @@ def get_random_profile(user_id):
         SELECT user_id, gender, age, city, looking, about, photo_id
         FROM users
         WHERE user_id != %s AND city=%s
-        ORDER BY RANDOM() LIMIT 1
+        ORDER BY RANDOM()
+        LIMIT 1
         """, (user_id, city[0]))
         row = c.fetchone()
     conn.close()
@@ -195,6 +197,7 @@ async def show_profile(update, context):
 async def like_profile(update, context):
     from_user = update.effective_user.id
     to_user = context.user_data.get("current_profile")
+
     if not to_user:
         await update.message.reply_text("Нет анкеты")
         return
@@ -234,6 +237,7 @@ async def my_profile(update, context):
         return
 
     gender, age, city, looking, about, photo_id = p
+
     await update.message.reply_photo(
         photo=photo_id,
         caption=f"👤 {gender}, {age}\n📍 {city}\n🎯 {looking}\n\n💬 {about}",
@@ -254,7 +258,7 @@ async def router(update, context):
         await show_profile(update, context)
     elif text == "👤 Моя анкета":
         await my_profile(update, context)
-    elif context.user_data.get("step") and context.user_data.get("step") != "photo":
+    elif context.user_data.get("step"):
         await handle_profile(update, context)
 
 # ================= MAIN =================
