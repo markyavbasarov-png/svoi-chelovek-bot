@@ -93,7 +93,7 @@ def main_menu_kb():
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="❤️", callback_data="like"),
+            InlineKeyboardButton(text="♥️", callback_data="like"),
             InlineKeyboardButton(text="❌", callback_data="dislike")
         ]
     ])
@@ -249,8 +249,12 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         profile = await cur.fetchone()
 
     if not profile:
-        await call.message.answer("Анкеты закончились 🤍", reply_markup=main_menu_kb())
-        return
+        await call.message.answer(
+    "💫 Сейчас подходящих анкет нет\n\n"
+    "Новые люди обязательно появятся.\n"
+    "Мы будем здесь и будем ждать 🩶",
+    reply_markup=main_menu_kb()
+)
 
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile, browse_kb())
@@ -261,7 +265,7 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
     # подтверждение нажатия
-    await call.message.answer("❤️" if call.data == "like" else "❌")
+    await call.message.answer("♥️" if call.data == "like" else "❌")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
