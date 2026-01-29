@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import aiosqlite
 
 from aiogram import Bot, Dispatcher, F
@@ -9,7 +10,9 @@ from aiogram.types import (
 )
 from aiogram.filters import CommandStart
 
-API_TOKEN = "TOKEN"
+# ================== CONFIG ==================
+
+API_TOKEN = os.getenv("BOT_TOKEN")  # !!! ОБЯЗАТЕЛЬНО через env
 DB = "database.db"
 
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +20,8 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(API_TOKEN)
 dp = Dispatcher()
 
+# хранение текущей анкеты пользователя
+user_current_profile = {}
 
 # ================== KEYBOARDS ==================
 
@@ -61,7 +66,6 @@ def match_kb(user_id: int):
         ]
     ])
 
-
 # ================== DB HELPERS ==================
 
 async def get_next_profile(viewer_id: int):
@@ -71,7 +75,7 @@ async def get_next_profile(viewer_id: int):
             FROM profiles
             WHERE id != ?
               AND id NOT IN (
-                SELECT to_user FROM likes WHERE from_user = ?
+                  SELECT to_user FROM likes WHERE from_user = ?
               )
             ORDER BY RANDOM()
             LIMIT 1
@@ -104,7 +108,6 @@ async def add_like(from_user: int, to_user: int) -> bool:
 
     return bool(match)
 
-
 # ================== START ==================
 
 @dp.message(CommandStart())
@@ -114,10 +117,11 @@ async def start(message: Message):
         "«свойЧеловек» — это про тепло и поддержку.\n\n"
         "Начнём знакомство?",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="давай 🤍", callback_data="browse")]]
+            inline_keyboard=[
+                [InlineKeyboardButton(text="давай 🤍", callback_data="browse")]
+            ]
         )
     )
-
 
 # ================== BROWSE ==================
 
@@ -131,6 +135,7 @@ async def browse(call: CallbackQuery):
             "В вашем городе больше нет новых людей",
             reply_markup=main_menu_kb()
         )
+        await call.answer()
         return
 
     user_id, name, age, city, goal, photo_id = profile
@@ -146,26 +151,20 @@ async def browse(call: CallbackQuery):
         reply_markup=like_kb()
     )
 
-    await call.answer()
+    # сохраняем текущую анкету
+    user_current_profile[call.from_user.id] = user_id
 
+    await call.answer()
 
 # ================== LIKE / DISLIKE ==================
 
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery):
-    async with aiosqlite.connect(DB) as db:
-        cursor = await db.execute("""
-            SELECT to_user FROM likes
-            WHERE from_user = ?
-            ORDER BY ROWID DESC LIMIT 1
-        """, (call.from_user.id,))
-        row = await cursor.fetchone()
+    to_user_id = user_current_profile.get(call.from_user.id)
 
-    if not row:
+    if not to_user_id:
         await call.answer()
         return
-
-    to_user_id = row[0]
 
     if call.data == "like":
         is_match = await add_like(call.from_user.id, to_user_id)
@@ -190,7 +189,6 @@ async def like_dislike(call: CallbackQuery):
 
     await browse(call)
 
-
 # ================== LIKE BACK ==================
 
 @dp.callback_query(F.data.startswith("like_back:"))
@@ -212,11 +210,9 @@ async def like_back(call: CallbackQuery):
 
     await call.answer()
 
-
 @dp.callback_query(F.data.startswith("dislike_back:"))
 async def dislike_back(call: CallbackQuery):
     await call.answer("Хорошо 🤍")
-
 
 # ================== RUN ==================
 
