@@ -135,15 +135,14 @@ async def my_profile(message: Message):
 
     # ❌ анкеты нет
     if not exists:
-       await message.answer(
+        await message.answer(
             "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
             reply_markup=start_kb()
         )
-        return
+        return   # ← ВАЖНО: НА ОДНОМ УРОВНЕ С await, БЕЗ ЛИШНИХ ПРОБЕЛОВ
 
-    # ✅ показываем анкету С КНОПКАМИ
+    # ✅ показываем анкету (с кнопками)
     await send_my_profile(message.from_user.id)
-
 # ===== CALLBACK HANDLERS =====
 
 @dp.callback_query(F.data == "edit_profile")
