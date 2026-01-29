@@ -93,7 +93,7 @@ def main_menu_kb():
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="❤️", callback_data="like"),
+            InlineKeyboardButton(text="♥️", callback_data="like"),
             InlineKeyboardButton(text="❌", callback_data="dislike")
         ]
     ])
@@ -115,103 +115,49 @@ async def start(message: Message, state: FSMContext):
         reply_markup=start_kb()
     )
 
-# ================== SAVE ==================
-async def save_profile(user, state, photo_id):
-    data = await state.get_data()
-    async with aiosqlite.connect(DB) as db:
-        await db.execute("""
-        INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user.id,
-            user.username,
-            data["name"],
-            data["age"],
-            data["city"],
-            data["role"],
-            data["goal"],
-            data.get("about"),
-            photo_id
-        ))
-        await db.commit()
-    await state.clear()
-
-# ================== PROFILE CARD ==================
-async def send_profile_card(chat_id: int, profile: tuple, kb):
-    uid, name, age, city, role, goal, about, photo_id = profile
-    text = (
-        f"{role} {name}, {age} · 📍 {city}\n"
-        f"Ищу: {goal}\n\n"
-        f"{about or ''}"
-    )
-    if photo_id:
-        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
-    else:
-        await bot.send_message(chat_id, text, reply_markup=kb)
-
-# ================== LIKES + NOTIFICATIONS ==================
-@dp.callback_query(F.data.in_(["like", "dislike"]))
-async def like_dislike(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "start_form")
+async def start_form(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await call.message.answer("❤️" if call.data == "like" else "❌")
+    await call.message.answer("Как тебя зовут?")
+    await state.set_state(Profile.name)
 
-    data = await state.get_data()
-    to_user = data.get("current_profile_id")
-    from_user = call.from_user.id
+# ================== FSM FLOW ==================
+@dp.message(Profile.name)
+async def get_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer("Сколько тебе лет?")
+    await state.set_state(Profile.age)
 
-    if not to_user:
-        return
+@dp.message(Profile.age)
+async def get_age(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        return await message.answer("Введи возраст числом 🙂")
+    await state.update_data(age=int(message.text))
+    await message.answer("Из какого ты города?")
+    await state.set_state(Profile.city)
 
-    if call.data == "like":
-        async with aiosqlite.connect(DB) as db:
-            await db.execute(
-                "INSERT OR IGNORE INTO likes VALUES (?, ?)",
-                (from_user, to_user)
-            )
-            await db.commit()
+@dp.message(Profile.city)
+async def get_city(message: Message, state: FSMContext):
+    await state.update_data(city=message.text)
+    await message.answer("Кто ты?", reply_markup=role_kb())
+    await state.set_state(Profile.role)
 
-            cur = await db.execute(
-                "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-                (to_user, from_user)
-            )
-            is_match = await cur.fetchone()
+@dp.callback_query(Profile.role, F.data.startswith("role_"))
+async def get_role(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.update_data(role=call.data.replace("role_", ""))
+    await call.message.answer("Что ты ищешь?", reply_markup=goal_kb())
+    await state.set_state(Profile.goal)
 
-        if is_match:
-            await notify_match(from_user, to_user)
-        else:
-            await notify_like(from_user, to_user)
+@dp.callback_query(Profile.goal, F.data.startswith("goal_"))
+async def get_goal(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.update_data(goal=call.data.replace("goal_", ""))
+    await call.message.answer("Хочешь рассказать о себе?", reply_markup=skip_about_kb())
+    await state.set_state(Profile.about)
 
-    await show_next_profile(call, state)
-
-async def notify_like(from_user: int, to_user: int):
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users WHERE user_id = ?
-        """, (from_user,))
-        profile = await cur.fetchone()
-
-    await bot.send_message(
-        to_user,
-        "💌 Ты кому-то понравился\nПосмотри, может это он/она 🤍"
-    )
-    await send_profile_card(to_user, profile, browse_kb())
-
-async def notify_match(u1: int, u2: int):
-    for viewer, partner in [(u1, u2), (u2, u1)]:
-        async with aiosqlite.connect(DB) as db:
-            cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
-            """, (partner,))
-            profile = await cur.fetchone()
-
-        await bot.send_message(viewer, "💫 У вас взимано!")
-        await send_profile_card(viewer, profile, match_kb(partner))
-
-# ================== RUN ==================
-async def main():
-    await init_db()
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+@dp.message(Profile.about)
+async def get_about(message: Message, state: FSMContext):
+    await state.update_data(about=message.text)
+    await message.answer("Добавим фото?", reply_markup=photo_kb())
+    await state.set_state(Profile.photo
