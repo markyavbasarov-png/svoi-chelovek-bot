@@ -15,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 TOKEN = os.getenv("BOT_TOKEN")
 
 logging.basicConfig(level=logging.INFO)
+
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
@@ -29,7 +30,6 @@ async def init_db():
             username TEXT,
             role TEXT,
             goal TEXT,
-            child_age TEXT,
             city TEXT,
             about TEXT,
             photo_id TEXT
@@ -63,7 +63,8 @@ def browse_kb():
         [
             InlineKeyboardButton(text="❤️", callback_data="like"),
             InlineKeyboardButton(text="👎", callback_data="dislike")
-        ]
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
 
 def edit_menu_kb():
@@ -119,7 +120,7 @@ async def goal_chosen(call: CallbackQuery, state: FSMContext):
 async def city_entered(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Profile.about)
-    await message.answer("Пару слов о себе (или /skip)")
+    await message.answer("Пару слов о себе (или напишите /skip)")
 
 @dp.message(Profile.about)
 async def about_entered(message: Message, state: FSMContext):
@@ -127,8 +128,9 @@ async def about_entered(message: Message, state: FSMContext):
         await state.update_data(about=None)
     else:
         await state.update_data(about=message.text)
+
     await state.set_state(Profile.photo)
-    await message.answer("Отправьте фото или /skip")
+    await message.answer("Отправьте фото или напишите /skip")
 
 @dp.message(Profile.photo, F.photo)
 async def photo_received(message: Message, state: FSMContext):
@@ -144,13 +146,12 @@ async def save_profile(user, state, photo_id):
     data = await state.get_data()
     async with aiosqlite.connect(DB) as db:
         await db.execute("""
-        INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             user.id,
             user.username,
             data["role"],
             data["goal"],
-            None,
             data["city"],
             data.get("about"),
             photo_id
@@ -251,7 +252,7 @@ async def show_next_profile(call: CallbackQuery):
         row = await cur.fetchone()
 
     if not row:
-        await call.message.answer("Анкеты закончились 🤍")
+        await call.message.answer("Анкеты закончились 🤍", reply_markup=main_menu_kb())
         return
 
     role, goal, city, about, photo_id = row
