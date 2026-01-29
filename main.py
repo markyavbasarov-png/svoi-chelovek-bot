@@ -99,11 +99,6 @@ def browse_kb():
         ]
     ])
 
-def view_like_kb(user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Посмотреть анкету", callback_data=f"view_like_{user_id}")]
-    ])
-
 def match_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={user_id}")]
@@ -296,6 +291,8 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     await show_next_profile(call, state)
 
+from aiogram.fsm.context import FSMContext
+
 async def notify_like(from_user_id: int, to_user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -305,12 +302,18 @@ async def notify_like(from_user_id: int, to_user_id: int):
         profile = await cur.fetchone()
 
     if profile:
+        state = dp.fsm.storage
+        await state.update_data(
+            chat=to_user_id,
+            data={"current_profile_id": from_user_id}
+        )
+
         await send_profile_card(
             to_user_id,
             profile,
-            view_like_kb(from_user_id)
+            browse_kb()
         )
-
+)
 @dp.callback_query(F.data.startswith("view_like_"))
 async def view_like(call: CallbackQuery, state: FSMContext):
     uid = int(call.data.replace("view_like_", ""))
