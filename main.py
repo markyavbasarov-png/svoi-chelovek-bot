@@ -78,16 +78,51 @@ def skip_about_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_about")]
     ])
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 def photo_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📷 Загрузить фото", callback_data="upload_photo")],
-        [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
+        [
+            InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")
+        ],
+        [
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")
+        ]
     ])
+
+
+def edit_profile_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="✏️ Редактировать",
+                callback_data="edit_profile"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="❤️ Смотреть анкеты",
+                callback_data="browse_profiles"
+            )
+        ]
+    ])
+
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
+        [
+            InlineKeyboardButton(
+                text="👀 Смотреть анкеты",
+                callback_data="browse_profiles"
+            )
+        ]
+    ])
+
+
+def main_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse_profiles")]
     ])
     
 def my_profile_kb():
