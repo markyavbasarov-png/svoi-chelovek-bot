@@ -204,7 +204,7 @@ async def save_profile(user, state, photo_id):
         await db.commit()
     await state.clear()
 
-# ================== BROWSE + CITY FILTER ==================
+# ================== BROWSE ==================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -212,36 +212,17 @@ async def browse(call: CallbackQuery, state: FSMContext):
 
 async def show_next_profile(call: CallbackQuery, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT city FROM users WHERE user_id = ?",
-            (call.from_user.id,)
-        )
-        row = await cur.fetchone()
-
-        if not row:
-            return await call.message.answer("Сначала заполни анкету 🤍")
-
-        city = row[0]
-
         cur = await db.execute("""
         SELECT user_id, name, age, city, role, goal, about, photo_id
         FROM users
-        WHERE city = ?
-          AND user_id != ?
-          AND user_id NOT IN (
-              SELECT to_user FROM likes WHERE from_user = ?
-          )
+        WHERE user_id != ?
         ORDER BY RANDOM()
         LIMIT 1
-        """, (city, call.from_user.id, call.from_user.id))
-
+        """, (call.from_user.id,))
         profile = await cur.fetchone()
 
     if not profile:
-        return await call.message.answer(
-            "Анкеты в твоём городе закончились 🤍",
-            reply_markup=main_menu_kb()
-        )
+        return await call.message.answer("Пока анкет нет 😌")
 
     await state.update_data(current_profile_id=profile[0])
     await send_profile(call.from_user.id, profile, browse_kb())
@@ -292,13 +273,13 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     await show_next_profile(call, state)
 
-async def notify_like(from_user, to_user):
+async def notify_like(from_user: int, to_user: int):
     await bot.send_message(
         to_user,
-        "💌 Ты кому-то понравился.\nПосмотри, может это он или она 🤍"
+        "💌 Ты кому-то понравился 🤍"
     )
 
-async def notify_match(u1, u2):
+async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
         async with aiosqlite.connect(DB) as db:
             cur = await db.execute("""
