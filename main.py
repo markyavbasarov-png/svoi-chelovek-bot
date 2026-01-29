@@ -313,37 +313,37 @@ async def send_my_profile(user_id: int):
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
-async def browse(call: CallbackQuery, state: FSMContext):
-    await show_next_profile(call, state)
-
-async def show_next_profile(call: CallbackQuery, state: FSMContext):
+async def browse_profiles(call: CallbackQuery, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users
-        WHERE city = (SELECT city FROM users WHERE user_id = ?)
-        AND user_id != ?
-        AND user_id NOT IN (
-            SELECT to_user FROM likes WHERE from_user = ?
+        cur = await db.execute(
+            """
+            SELECT user_id, name, age, city, role, goal, about, photo
+            FROM users
+            WHERE city = (SELECT city FROM users WHERE user_id = ?)
+            AND user_id != ?
+            AND user_id NOT IN (
+                SELECT to_user FROM likes WHERE from_user = ?
+            )
+            ORDER BY RANDOM()
+            LIMIT 1
+            """,
+            (call.from_user.id, call.from_user.id, call.from_user.id)
         )
-        ORDER BY RANDOM()
-        LIMIT 1
-        """, (call.from_user.id, call.from_user.id, call.from_user.id))
         profile = await cur.fetchone()
-if not profile:
-    await call.message.answer(
-        "🤍 Сейчас подходящих анкет нет\n\n"
-        "Можно сделать паузу,\n"
-        "налить чай\n"
-        "и вернуться позже —\n"
-        "мы будем ждать 🤍",
-        reply_markup=main_menu_kb()
-    )
-    return
+
+    if not profile:
+        await call.message.answer(
+            "🤍 Сейчас подходящих анкет нет\n\n"
+            "Можно сделать паузу,\n"
+            "налить чай\n"
+            "и вернуться позже —\n"
+            "мы будем ждать 🤍",
+            reply_markup=main_menu_kb()
+        )
+        return
 
     await state.update_data(current_profile_id=profile[0])
-    await send_profile_card(call.from_user.id, profile, browse_kb())
-
+    await send_profile_card(call.from_user.id, profile)
 # ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
