@@ -229,11 +229,11 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
     await state.update_data(about=None)
     await state.set_state(Profile.photo)
     await call.message.edit_text(
-        "Если хочется, можно добавить фото 🤍\n\n"
-        "А если не сейчас —\n"
-        "это тоже нормально."
-        reply_markup=photo_kb()
-    )
+    "Если хочется, можно добавить фото 🤍\n\n"
+    "А если не сейчас —\n"
+    "это тоже нормально.",
+    reply_markup=photo_kb()
+)
 
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
