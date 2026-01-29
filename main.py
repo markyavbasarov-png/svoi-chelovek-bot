@@ -35,20 +35,12 @@ async def init_db():
             photo_id TEXT
         )
         """)
-        await db.execute("""
-        CREATE TABLE IF NOT EXISTS likes (
-            from_user INTEGER,
-            to_user INTEGER,
-            UNIQUE(from_user, to_user)
-        )
-        """)
         await db.commit()
 
 # ---------- FSM ----------
 class Profile(StatesGroup):
     role = State()
     goal = State()
-    child_age = State()
     city = State()
     about = State()
     photo = State()
@@ -127,7 +119,7 @@ async def goal_chosen(call: CallbackQuery, state: FSMContext):
 async def city_entered(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Profile.about)
-    await message.answer("Пару слов о себе (или отправьте /skip)")
+    await message.answer("Пару слов о себе (или /skip)")
 
 @dp.message(Profile.about)
 async def about_entered(message: Message, state: FSMContext):
@@ -186,12 +178,12 @@ async def send_my_profile(user_id: int):
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
     await state.set_state(EditProfile.menu)
-    await call.message.answer("Что изменить?", reply_markup=edit_menu_kb())
+    await call.message.edit_text("Что изменить?", reply_markup=edit_menu_kb())
 
 @dp.callback_query(F.data == "edit_city")
 async def edit_city(call: CallbackQuery, state: FSMContext):
     await state.set_state(EditProfile.city)
-    await call.message.answer("Введите новый город:")
+    await call.message.edit_text("Введите новый город:")
 
 @dp.message(EditProfile.city)
 async def save_city(message: Message, state: FSMContext):
@@ -207,7 +199,7 @@ async def save_city(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(EditProfile.about)
-    await call.message.answer("Введите новое описание:")
+    await call.message.edit_text("Введите новое описание:")
 
 @dp.message(EditProfile.about)
 async def save_about(message: Message, state: FSMContext):
@@ -223,7 +215,7 @@ async def save_about(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(EditProfile.photo)
-    await call.message.answer("Отправьте новое фото:")
+    await call.message.edit_text("Отправьте новое фото:")
 
 @dp.message(EditProfile.photo, F.photo)
 async def save_new_photo(message: Message, state: FSMContext):
@@ -239,6 +231,7 @@ async def save_new_photo(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "back_to_profile")
 async def back(call: CallbackQuery, state: FSMContext):
     await state.clear()
+    await call.message.delete()
     await send_my_profile(call.from_user.id)
 
 # ---------- BROWSE ----------
