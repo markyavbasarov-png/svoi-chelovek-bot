@@ -87,8 +87,7 @@ def photo_kb():
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
 
 def browse_kb():
@@ -251,7 +250,7 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 
     if not profile:
         await call.message.answer(
-            "Анкеты закончились 🤍\nВ вашем городе больше нет новых людей",
+            "Анкеты закончились 🤍",
             reply_markup=main_menu_kb()
         )
         return
@@ -259,7 +258,7 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile, browse_kb())
 
-# ================== LIKES + SOFT MATCH ==================
+# ================== LIKES + MATCH ==================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -291,8 +290,6 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     await show_next_profile(call, state)
 
-from aiogram.fsm.context import FSMContext
-
 async def notify_like(from_user_id: int, to_user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -302,31 +299,7 @@ async def notify_like(from_user_id: int, to_user_id: int):
         profile = await cur.fetchone()
 
     if profile:
-        state = dp.fsm.storage
-        await state.update_data(
-            chat=to_user_id,
-            data={"current_profile_id": from_user_id}
-        )
-
-        await send_profile_card(
-            to_user_id,
-            profile,
-            browse_kb()
-        )
-)
-@dp.callback_query(F.data.startswith("view_like_"))
-async def view_like(call: CallbackQuery, state: FSMContext):
-    uid = int(call.data.replace("view_like_", ""))
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users WHERE user_id = ?
-        """, (uid,))
-        profile = await cur.fetchone()
-
-    if profile:
-        await state.update_data(current_profile_id=uid)
-        await send_profile_card(call.from_user.id, profile, browse_kb())
+        await send_profile_card(to_user_id, profile, browse_kb())
 
 async def notify_match(u1: int, u2: int):
     await bot.send_message(
