@@ -252,8 +252,11 @@ async def browse(call: CallbackQuery):
 
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery):
+    await call.answer()  # 🔥 ОБЯЗАТЕЛЬНО
+
     if call.data == "like":
         await save_like(call.from_user.id, call.message.text)
+
     await show_next_profile(call)
 
 @dp.callback_query(F.data == "back")
