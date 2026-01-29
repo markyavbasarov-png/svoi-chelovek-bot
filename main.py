@@ -122,12 +122,16 @@ def match_kb(user_id: int):
 async def start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Привет, 🤍\n\n"
-        "Ты не случайно здесь.\n"
-        "«свойЧеловек» — это про тепло и поддержку.\n\n"
-        "Начнём знакомство?",
-        reply_markup=start_kb()
-    )
+    "Привет 🤍\n\n"
+    "Ты не случайно здесь.\n\n"
+    "«свойЧеловек» — это место для родителей,\n"
+    "где можно быть собой.\n"
+    "Без спешки. Без оценок.\n\n"
+    "Здесь не ищут идеальных.\n"
+    "Здесь ищут своих.\n\n"
+    "Начнём знакомство?",
+    reply_markup=start_kb()
+)
 
 # ================= MY PROFILE =================
 @dp.message(Command("myprofile"))
@@ -170,7 +174,14 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
 async def start_form(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.set_state(Profile.name)
-    await call.message.edit_text("Как тебя зовут?")
+    await call.message.edit_text(
+    "Небольшая анкета —\n"
+    "чтобы другим было чуть легче тебя узнать 🤍\n\n"
+    "Можно отвечать просто.\n"
+    "Можно пропускать.\n"
+    "Всё — по желанию.\n\n"
+    "Как тебя зовут?"
+)
 
 @dp.message(Profile.name)
 async def set_name(message: Message, state: FSMContext):
@@ -203,9 +214,13 @@ async def set_role(call: CallbackQuery, state: FSMContext):
 async def set_goal(call: CallbackQuery, state: FSMContext):
     await state.update_data(goal=call.data.replace("goal_", ""))
     await state.set_state(Profile.about)
+
     await call.message.edit_text(
-        "Здесь ищут не идеальных,\nа своих 🤍\n\n"
-        "Если хочется — расскажите пару слов о себе.",
+        "Здесь ищут не идеальных,\n"
+        "а своих 🤍\n\n"
+        "Если хочется —\n"
+        "напиши пару слов о себе.\n\n"
+        "Если нет — можно пропустить.",
         reply_markup=skip_about_kb()
     )
 
@@ -214,7 +229,9 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
     await state.update_data(about=None)
     await state.set_state(Profile.photo)
     await call.message.edit_text(
-        "Если хочется, можно добавить фото 🤍",
+        "Если хочется, можно добавить фото 🤍\n\n"
+        "А если не сейчас —\n"
+        "это тоже нормально."
         reply_markup=photo_kb()
     )
 
@@ -274,13 +291,25 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users WHERE user_id = ?
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
     if profile:
-        await send_profile_card(user_id, profile, edit_profile_kb())
+        await bot.send_message(
+            user_id,
+            "Вот твоя анкета 🤍\n\n"
+            "Если захочешь —\n"
+            "можно что-то изменить\n"
+            "или просто посмотреть других."
+        )
+
+        await send_profile_card(
+            user_id,
+            profile,
+            edit_profile_kb()
+        )
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
@@ -304,9 +333,11 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 
     if not profile:
         await call.message.answer(
-            "💫 Сейчас подходящих анкет нет\n\n"
-            "Новые люди обязательно появятся.\n"
-            "Мы будем здесь и будем ждать 🩶",
+             "🤍 Сейчас подходящих анкет нет\n\n"
+             "Можно сделать паузу,\n"
+             "налить чай\n"
+             "и вернуться позже —\n"
+             "мы будем ждать 🤍"
             reply_markup=main_menu_kb()
         )
         return
@@ -353,7 +384,13 @@ async def notify_match(u1: int, u2: int):
             """, (partner,))
             profile = await cur.fetchone()
 
-        await bot.send_message(viewer, "🤍 Кажется, это взаимно")
+        await bot.send_message(
+            viewer,
+            "🤍 Кажется, это взаимно\n\n"
+            "Можно просто сказать\n"
+            "«привет».\n"
+            "Этого достаточно."
+)
         await send_profile_card(viewer, profile, match_kb(partner))
 
 # ================= RUN =================
