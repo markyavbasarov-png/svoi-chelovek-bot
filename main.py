@@ -109,7 +109,8 @@ async def start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "Привет, 🤍\n\n"
-        "«свойЧеловек» — это про тепло и поддержку.\n\n"
+        "Ты не случайно здесь.\n"
+        "«СвойЧеловек» — это про тепло и поддержку.\n\n"
         "Начнём знакомство?",
         reply_markup=start_kb()
     )
@@ -152,7 +153,7 @@ async def set_goal(call: CallbackQuery, state: FSMContext):
     await state.update_data(goal=call.data.replace("goal_", ""))
     await state.set_state(Profile.about)
     await call.message.edit_text(
-        "Если хочется — расскажите пару слов о себе 🤍",
+        "Если хочется — расскажи пару слов о себе 🤍",
         reply_markup=skip_about_kb()
     )
 
@@ -215,11 +216,6 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
     else:
         await bot.send_message(chat_id, text, reply_markup=kb)
 
-def add_match_hint(profile: tuple):
-    uid, name, age, city, role, goal, about, photo_id = profile
-    hint = "🤍 Кажется, это взаимно\n\n"
-    return (uid, name, age, city, role, goal, hint + (about or ""), photo_id)
-
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -241,13 +237,14 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         cur = await db.execute("""
         SELECT user_id, name, age, city, role, goal, about, photo_id
         FROM users
-        WHERE user_id != ?
+        WHERE city = (SELECT city FROM users WHERE user_id = ?)
+        AND user_id != ?
         AND user_id NOT IN (
             SELECT to_user FROM likes WHERE from_user = ?
         )
         ORDER BY RANDOM()
         LIMIT 1
-        """, (call.from_user.id, call.from_user.id))
+        """, (call.from_user.id, call.from_user.id, call.from_user.id))
         profile = await cur.fetchone()
 
     if not profile:
@@ -287,6 +284,7 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     await show_next_profile(call, state)
 
+# ================== MATCH UX ==================
 async def notify_match(u1: int, u2: int):
     async with aiosqlite.connect(DB) as db:
         cur1 = await db.execute("""
@@ -302,9 +300,12 @@ async def notify_match(u1: int, u2: int):
         p2 = await cur2.fetchone()
 
     if p1:
-        await send_profile_card(u1, add_match_hint(p1), match_kb(u2))
+        await bot.send_message(u1, "🤍 Кажется, это взаимно")
+        await send_profile_card(u1, p1, match_kb(u2))
+
     if p2:
-        await send_profile_card(u2, add_match_hint(p2), match_kb(u1))
+        await bot.send_message(u2, "🤍 Кажется, это взаимно")
+        await send_profile_card(u2, p2, match_kb(u1))
 
 # ================== RUN ==================
 async def main():
