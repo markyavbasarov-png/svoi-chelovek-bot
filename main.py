@@ -94,8 +94,8 @@ def main_menu_kb():
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="❤️", callback_data="like"),
-            InlineKeyboardButton(text="👎", callback_data="dislike")
+            InlineKeyboardButton(text="♥️", callback_data="like"),
+            InlineKeyboardButton(text="❌", callback_data="dislike")
         ],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="back")]
     ])
