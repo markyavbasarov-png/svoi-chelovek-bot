@@ -115,6 +115,25 @@ async def start(message: Message, state: FSMContext):
         reply_markup=start_kb()
     )
 
+# ================== MY PROFILE ==================
+@dp.message(Command("myprofile"))
+async def my_profile(message: Message):
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT 1 FROM users WHERE user_id = ?",
+            (message.from_user.id,)
+        )
+        exists = await cur.fetchone()
+
+    if not exists:
+        await message.answer(
+            "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
+            reply_markup=start_kb()
+        )
+        return
+
+    await send_my_profile(message.from_user.id)
+
 # ================== PROFILE FLOW ==================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
@@ -135,6 +154,12 @@ async def set_age(message: Message, state: FSMContext):
     await state.update_data(age=int(message.text))
     await state.set_state(Profile.city)
     await message.answer("Из какого ты города?")
+
+@dp.message(Profile.city)
+async def set_city(message: Message, state: FSMContext):
+    await state.update_data(city=message.text)
+    await state.set_state(Profile.role)
+    await message.answer("Кто ты сейчас?", reply_markup=role_kb())
 
 @dp.callback_query(F.data.startswith("role_"), Profile.role)
 async def set_role(call: CallbackQuery, state: FSMContext):
