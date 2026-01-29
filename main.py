@@ -165,8 +165,6 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
     await call.message.answer("Напиши новый текст анкеты 💬")
 
 # ================== PROFILE FLOW ==================
-# ====== START FORM ======
-
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -284,7 +282,6 @@ async def save_profile(user, state, photo_id):
     await state.clear()
 
 # ================== PROFILE RENDER ==================
-# ================= PROFILE RENDER =================
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
 
