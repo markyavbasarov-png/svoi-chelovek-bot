@@ -65,7 +65,7 @@ def role_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👩‍🍼 Мама", callback_data="role_Мама")],
         [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
-        [InlineKeyboardButton(text="🌱 Будущая мама / папа", callback_data="role_Будущий")]
+        [InlineKeyboardButton(text="👼🏼 Будущий родитель", callback_data="role_Будущий")]
     ])
 
 def goal_kb():
