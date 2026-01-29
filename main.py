@@ -135,7 +135,7 @@ async def my_profile(message: Message):
 
     # ❌ анкеты нет
     if not exists:
-        await message.answer(
+       await message.answer(
             "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
             reply_markup=start_kb()
         )
@@ -263,7 +263,7 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
         f"{about or ''}"
     )
     if photo_id:
-    await bot.send_photo(
+        await bot.send_photo(
         chat_id=chat_id,
         photo=photo_id,
         caption=text,
