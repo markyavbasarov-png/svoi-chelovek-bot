@@ -89,7 +89,15 @@ def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
-
+    
+def my_profile_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
+    ])
+    
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -133,6 +141,28 @@ async def my_profile(message: Message):
         return
 
     await send_my_profile(message.from_user.id)
+
+# ===== CALLBACK HANDLERS =====
+
+@dp.callback_query(F.data == "edit_profile")
+async def edit_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(Profile.name)
+    await call.message.answer(
+        "Давай обновим анкету 🤍\nКак тебя зовут?"
+    )
+
+
+@dp.callback_query(F.data == "edit_photo")
+async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.photo)
+    await call.message.answer("Пришли новое фото 📸")
+
+
+@dp.callback_query(F.data == "edit_about")
+async def edit_about(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.about)
+    await call.message.answer("Напиши новый текст анкеты 💬")
 
 # ================== PROFILE FLOW ==================
 @dp.callback_query(F.data == "start_form")
