@@ -330,8 +330,7 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         LIMIT 1
         """, (call.from_user.id, call.from_user.id, call.from_user.id))
         profile = await cur.fetchone()
-
-    if not profile:
+if not profile:
     await call.message.answer(
         "🤍 Сейчас подходящих анкет нет\n\n"
         "Можно сделать паузу,\n"
