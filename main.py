@@ -136,12 +136,6 @@ async def set_age(message: Message, state: FSMContext):
     await state.set_state(Profile.city)
     await message.answer("Из какого ты города?")
 
-@dp.message(Profile.city)
-async def set_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
-    await state.set_state(Profile.role)
-    await message.answer("Кто ты сейчас?", reply_markup=role_kb())
-
 @dp.callback_query(F.data.startswith("role_"), Profile.role)
 async def set_role(call: CallbackQuery, state: FSMContext):
     await state.update_data(role=call.data.replace("role_", ""))
