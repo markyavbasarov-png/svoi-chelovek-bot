@@ -15,7 +15,6 @@ DB = "users.db"
 bot = Bot(TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-
 # ---------- DATABASE ----------
 async def init_db():
     async with aiosqlite.connect(DB) as db:
