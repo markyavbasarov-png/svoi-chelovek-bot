@@ -233,6 +233,18 @@ async def send_my_profile(user_id: int):
     else:
         await bot.send_message(user_id, text, reply_markup=main_menu_kb())
 
+# ================== EDIT PROFILE ==================
+@dp.callback_query(F.data == "edit_profile")
+async def edit_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(Profile.name)
+
+    await call.message.answer(
+        "Хорошо 🤍\n\n"
+        "Давай обновим анкету.\n"
+        "Начнём сначала.\n\n"
+        "Как тебя зовут?"
+    )
 # ================== BROWSE ==================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery):
