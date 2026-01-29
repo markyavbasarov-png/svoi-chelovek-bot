@@ -254,26 +254,29 @@ async def save_profile(user, state, photo_id):
     await state.clear()
 
 # ================== PROFILE RENDER ==================
+# ================= PROFILE RENDER =================
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
+
     text = (
         f"{role} {name}, {age} · 📍 {city}\n"
-        f"Ищу: {goal}\n\n"
+        f"🔍: {goal}\n\n"
         f"{about or ''}"
     )
+
     if photo_id:
         await bot.send_photo(
-        chat_id=chat_id,
-        photo=photo_id,
-        caption=text,
-        reply_markup=kb   # 🔥 ОБЯЗАТЕЛЬНО
-    )
-else:
-    await bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        reply_markup=kb
-    )
+            chat_id=chat_id,
+            photo=photo_id,
+            caption=text,
+            reply_markup=kb
+        )
+    else:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=kb
+        )
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
