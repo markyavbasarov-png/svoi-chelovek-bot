@@ -319,26 +319,31 @@ async def notify_like(from_user_id: int, to_user_id: int):
         f"🔔 У вас новый лайк 🤍\n\n{role} {name}, {age}\n📍 {city}"
     )
 
-async def notify_match(u1: int, u2: int):
+async def notify_like(from_user_id: int, to_user_id: int):
     async with aiosqlite.connect(DB) as db:
-        a = await db.execute("SELECT name, age, city, role FROM users WHERE user_id = ?", (u1,))
-        b = await db.execute("SELECT name, age, city, role FROM users WHERE user_id = ?", (u2,))
-        u1d = await a.fetchone()
-        u2d = await b.fetchone()
+        cur = await db.execute("""
+            SELECT name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE user_id = ?
+        """, (from_user_id,))
+        user = await cur.fetchone()
 
-    if not u1d or not u2d:
+    if not user:
         return
 
-    await bot.send_message(
-        u1,
-        "💫 У вас совпадение!\nМожно написать 🤍",
-        reply_markup=match_kb(u2)
+    name, age, city, role, goal, about, photo_id = user
+
+    text = (
+        "🔔 У вас новый лайк 🤍\n\n"
+        f"{role} {name}, {age} · 📍 {city}\n"
+        f"Ищу: {goal}\n\n"
+        f"{about or ''}"
     )
-    await bot.send_message(
-        u2,
-        "💫 У вас совпадение!\nМожно написать 🤍",
-        reply_markup=match_kb(u1)
-    )
+
+    if photo_id:
+        await bot.send_photo(to_user_id, photo_id, caption=text)
+    else:
+        await bot.send_message(to_user_id, text)
 
 # ================== RUN ==================
 async def main():
