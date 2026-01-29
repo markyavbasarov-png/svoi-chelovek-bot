@@ -78,53 +78,24 @@ def skip_about_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_about")]
     ])
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
 
 def photo_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")
-        ],
-        [
-            InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")
-        ]
+        [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
+        [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
-
 
 def edit_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="✏️ Редактировать",
-                callback_data="edit_profile"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="❤️ Смотреть анкеты",
-                callback_data="browse_profiles"
-            )
-        ]
+        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
     ])
-
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="👀 Смотреть анкеты",
-                callback_data="browse_profiles"
-            )
-        ]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
 
-
-def main_menu_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse_profiles")]
-    ])
-    
 def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
@@ -132,7 +103,7 @@ def my_profile_kb():
         [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
     ])
-    
+
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -168,45 +139,38 @@ async def my_profile(message: Message):
         )
         exists = await cur.fetchone()
 
-    # ❌ анкеты нет
     if not exists:
         await message.answer(
             "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
             reply_markup=start_kb()
         )
-        return   # ← ВАЖНО: НА ОДНОМ УРОВНЕ С await, БЕЗ ЛИШНИХ ПРОБЕЛОВ
+        return
 
-    # ✅ показываем анкету (с кнопками)
     await send_my_profile(message.from_user.id)
-# ===== CALLBACK HANDLERS =====
 
+# ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.set_state(Profile.name)
-    await call.message.answer(
-        "Давай обновим анкету 🤍\nКак тебя зовут?"
-    )
+    await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
 
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
     await call.message.answer("Пришли новое фото 📸")
 
-
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты 💬")
 
-# ================== PROFILE FLOW ==================
+# ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.set_state(Profile.name)
     await call.message.edit_text("Как тебя зовут?")
-
-# ====== NAME ======
 
 @dp.message(Profile.name)
 async def set_name(message: Message, state: FSMContext):
@@ -214,19 +178,14 @@ async def set_name(message: Message, state: FSMContext):
     await state.set_state(Profile.age)
     await message.answer("Сколько тебе лет?")
 
-# ====== AGE ======
-
 @dp.message(Profile.age)
 async def set_age(message: Message, state: FSMContext):
     if not message.text.isdigit():
         await message.answer("Возраст цифрами 🤍")
         return
-
     await state.update_data(age=int(message.text))
     await state.set_state(Profile.city)
     await message.answer("Из какого ты города?")
-
-# ====== CITY ======
 
 @dp.message(Profile.city)
 async def set_city(message: Message, state: FSMContext):
@@ -234,15 +193,11 @@ async def set_city(message: Message, state: FSMContext):
     await state.set_state(Profile.role)
     await message.answer("Кто ты сейчас?", reply_markup=role_kb())
 
-# ====== ROLE ======
-
 @dp.callback_query(F.data.startswith("role_"), Profile.role)
 async def set_role(call: CallbackQuery, state: FSMContext):
     await state.update_data(role=call.data.replace("role_", ""))
     await state.set_state(Profile.goal)
     await call.message.edit_text("Что вам сейчас ближе?", reply_markup=goal_kb())
-
-# ====== GOAL ======
 
 @dp.callback_query(F.data.startswith("goal_"), Profile.goal)
 async def set_goal(call: CallbackQuery, state: FSMContext):
@@ -254,8 +209,6 @@ async def set_goal(call: CallbackQuery, state: FSMContext):
         reply_markup=skip_about_kb()
     )
 
-# ====== ABOUT (SKIP) ======
-
 @dp.callback_query(F.data == "skip_about", Profile.about)
 async def skip_about(call: CallbackQuery, state: FSMContext):
     await state.update_data(about=None)
@@ -265,38 +218,27 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
         reply_markup=photo_kb()
     )
 
-# ====== ABOUT (TEXT) ======
-
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-# ====== PHOTO REQUEST ======
-
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
-# ====== PHOTO SKIP ======
-
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
-    await state.clear()
     await send_my_profile(call.from_user.id)
-
-# ====== PHOTO SAVE ======
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await save_profile(message.from_user, state, photo_id)
-    await state.clear()
+    await save_profile(message.from_user, state, message.photo[-1].file_id)
     await send_my_profile(message.from_user.id)
 
-# ================== SAVE ==================
+# ================= SAVE =================
 async def save_profile(user, state, photo_id):
     data = await state.get_data()
     async with aiosqlite.connect(DB) as db:
@@ -316,45 +258,31 @@ async def save_profile(user, state, photo_id):
         await db.commit()
     await state.clear()
 
-# ================== PROFILE RENDER ==================
+# ================= PROFILE RENDER =================
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
-
     text = (
         f"{role} {name}, {age} · 📍 {city}\n"
         f"🔍: {goal}\n\n"
         f"{about or ''}"
     )
-
     if photo_id:
-        await bot.send_photo(
-            chat_id=chat_id,
-            photo=photo_id,
-            caption=text,
-            reply_markup=kb
-        )
+        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
     else:
-        await bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=kb
-        )
+        await bot.send_message(chat_id, text, reply_markup=kb)
+
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
+        SELECT user_id, name, age, city, role, goal, about, photo_id
+        FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
     if profile:
-        await send_profile_card(
-            user_id,
-            profile,
-            edit_profile_kb()  # 🔥 ВОТ ТУТ
-        )
+        await send_profile_card(user_id, profile, edit_profile_kb())
 
-# ================== BROWSE ==================
+# ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
     await show_next_profile(call, state)
@@ -376,21 +304,20 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 
     if not profile:
         await call.message.answer(
-    "💫 Сейчас подходящих анкет нет\n\n"
-    "Новые люди обязательно появятся.\n"
-    "Мы будем здесь и будем ждать 🩶",
-    reply_markup=main_menu_kb()
-)
+            "💫 Сейчас подходящих анкет нет\n\n"
+            "Новые люди обязательно появятся.\n"
+            "Мы будем здесь и будем ждать 🩶",
+            reply_markup=main_menu_kb()
+        )
+        return
 
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile, browse_kb())
 
-# ================== LIKES + MATCH ==================
+# ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
-
-    # подтверждение нажатия
     await call.message.answer("♥️" if call.data == "like" else "❌")
 
     data = await state.get_data()
@@ -412,10 +339,8 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
                 "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
                 (to_user, from_user)
             )
-            is_match = await cur.fetchone()
-
-        if is_match:
-            await notify_match(from_user, to_user)
+            if await cur.fetchone():
+                await notify_match(from_user, to_user)
 
     await show_next_profile(call, state)
 
@@ -431,7 +356,7 @@ async def notify_match(u1: int, u2: int):
         await bot.send_message(viewer, "🤍 Кажется, это взаимно")
         await send_profile_card(viewer, profile, match_kb(partner))
 
-# ================== RUN ==================
+# ================= RUN =================
 async def main():
     await init_db()
     await dp.start_polling(bot)
