@@ -180,6 +180,14 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
     await send_my_profile(call.from_user.id)
 
+@dp.callback_query(F.data == "upload_photo", Profile.photo)
+async def upload_photo(call: CallbackQuery):
+    await call.message.edit_text(
+        "Хорошо 🤍\n\n"
+        "Просто отправь сюда фотографию.\n"
+        "Я аккуратно добавлю её в анкету 🌿"
+    )
+
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(message.from_user, state, message.photo[-1].file_id)
