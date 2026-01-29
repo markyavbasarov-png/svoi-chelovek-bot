@@ -165,10 +165,15 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
     await call.message.answer("Напиши новый текст анкеты 💬")
 
 # ================== PROFILE FLOW ==================
+# ====== START FORM ======
+
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     await state.set_state(Profile.name)
     await call.message.edit_text("Как тебя зовут?")
+
+# ====== NAME ======
 
 @dp.message(Profile.name)
 async def set_name(message: Message, state: FSMContext):
@@ -176,14 +181,19 @@ async def set_name(message: Message, state: FSMContext):
     await state.set_state(Profile.age)
     await message.answer("Сколько тебе лет?")
 
+# ====== AGE ======
+
 @dp.message(Profile.age)
 async def set_age(message: Message, state: FSMContext):
     if not message.text.isdigit():
         await message.answer("Возраст цифрами 🤍")
         return
+
     await state.update_data(age=int(message.text))
     await state.set_state(Profile.city)
     await message.answer("Из какого ты города?")
+
+# ====== CITY ======
 
 @dp.message(Profile.city)
 async def set_city(message: Message, state: FSMContext):
@@ -191,11 +201,15 @@ async def set_city(message: Message, state: FSMContext):
     await state.set_state(Profile.role)
     await message.answer("Кто ты сейчас?", reply_markup=role_kb())
 
+# ====== ROLE ======
+
 @dp.callback_query(F.data.startswith("role_"), Profile.role)
 async def set_role(call: CallbackQuery, state: FSMContext):
     await state.update_data(role=call.data.replace("role_", ""))
     await state.set_state(Profile.goal)
     await call.message.edit_text("Что вам сейчас ближе?", reply_markup=goal_kb())
+
+# ====== GOAL ======
 
 @dp.callback_query(F.data.startswith("goal_"), Profile.goal)
 async def set_goal(call: CallbackQuery, state: FSMContext):
@@ -207,11 +221,18 @@ async def set_goal(call: CallbackQuery, state: FSMContext):
         reply_markup=skip_about_kb()
     )
 
+# ====== ABOUT (SKIP) ======
+
 @dp.callback_query(F.data == "skip_about", Profile.about)
 async def skip_about(call: CallbackQuery, state: FSMContext):
     await state.update_data(about=None)
     await state.set_state(Profile.photo)
-    await call.message.edit_text("Если хочется, можно добавить фото 🤍", reply_markup=photo_kb())
+    await call.message.edit_text(
+        "Если хочется, можно добавить фото 🤍",
+        reply_markup=photo_kb()
+    )
+
+# ====== ABOUT (TEXT) ======
 
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
@@ -219,18 +240,27 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
+# ====== PHOTO REQUEST ======
+
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
+# ====== PHOTO SKIP ======
+
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
+    await state.clear()
     await send_my_profile(call.from_user.id)
+
+# ====== PHOTO SAVE ======
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    await save_profile(message.from_user, state, message.photo[-1].file_id)
+    photo_id = message.photo[-1].file_id
+    await save_profile(message.from_user, state, photo_id)
+    await state.clear()
     await send_my_profile(message.from_user.id)
 
 # ================== SAVE ==================
