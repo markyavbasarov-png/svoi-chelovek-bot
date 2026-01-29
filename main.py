@@ -65,7 +65,7 @@ def role_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👩‍🍼 Мама", callback_data="role_Мама")],
         [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
-        [InlineKeyboardButton(text="🌱 Будущая мама / папа", callback_data="role_Будущий")]
+        [InlineKeyboardButton(text="🌱 Будущий родитель", callback_data="role_Будущий")]
     ])
 
 def goal_kb():
@@ -105,59 +105,4 @@ def match_kb(user_id: int):
 
 # ================== START ==================
 @dp.message(CommandStart())
-async def start(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer(
-        "Привет, 🤍\n\n"
-        "Ты не случайно здесь.\n"
-        "«свойЧеловек» — это про тепло и поддержку.\n\n"
-        "Начнём знакомство?",
-        reply_markup=start_kb()
-    )
-
-@dp.callback_query(F.data == "start_form")
-async def start_form(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer("Как тебя зовут?")
-    await state.set_state(Profile.name)
-
-# ================== FSM FLOW ==================
-@dp.message(Profile.name)
-async def get_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer("Сколько тебе лет?")
-    await state.set_state(Profile.age)
-
-@dp.message(Profile.age)
-async def get_age(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        return await message.answer("Введи возраст числом 🙂")
-    await state.update_data(age=int(message.text))
-    await message.answer("Из какого ты города?")
-    await state.set_state(Profile.city)
-
-@dp.message(Profile.city)
-async def get_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
-    await message.answer("Кто ты?", reply_markup=role_kb())
-    await state.set_state(Profile.role)
-
-@dp.callback_query(Profile.role, F.data.startswith("role_"))
-async def get_role(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.update_data(role=call.data.replace("role_", ""))
-    await call.message.answer("Что ты ищешь?", reply_markup=goal_kb())
-    await state.set_state(Profile.goal)
-
-@dp.callback_query(Profile.goal, F.data.startswith("goal_"))
-async def get_goal(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.update_data(goal=call.data.replace("goal_", ""))
-    await call.message.answer("Хочешь рассказать о себе?", reply_markup=skip_about_kb())
-    await state.set_state(Profile.about)
-
-@dp.message(Profile.about)
-async def get_about(message: Message, state: FSMContext):
-    await state.update_data(about=message.text)
-    await message.answer("Добавим фото?", reply_markup=photo_kb())
-    await state.set_state(Profile.photo
+async def start(message: Message, state: FSMContext
