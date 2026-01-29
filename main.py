@@ -123,7 +123,8 @@ async def start(message: Message, state: FSMContext):
         reply_markup=start_kb()
     )
 
-# ================== MY PROFILE ==================
+# ================= MY PROFILE =================
+
 @dp.message(Command("myprofile"))
 async def my_profile(message: Message):
     async with aiosqlite.connect(DB) as db:
@@ -133,6 +134,7 @@ async def my_profile(message: Message):
         )
         exists = await cur.fetchone()
 
+    # ❌ анкеты нет
     if not exists:
         await message.answer(
             "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
@@ -140,8 +142,14 @@ async def my_profile(message: Message):
         )
         return
 
+    # ✅ 1. показываем анкету
     await send_my_profile(message.from_user.id)
 
+    # ✅ 2. кнопки редактирования
+    await message.answer(
+        "Что хочешь изменить?",
+        reply_markup=edit_profile_kb()
+    )
 # ===== CALLBACK HANDLERS =====
 
 @dp.callback_query(F.data == "edit_profile")
