@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import aiosqlite
 
 from aiogram import Bot, Dispatcher, F
@@ -10,9 +9,7 @@ from aiogram.types import (
 )
 from aiogram.filters import CommandStart
 
-# ================== CONFIG ==================
-
-API_TOKEN = os.getenv("BOT_TOKEN")  # !!! ОБЯЗАТЕЛЬНО через env
+API_TOKEN = "TOKEN"
 DB = "database.db"
 
 logging.basicConfig(level=logging.INFO)
@@ -20,8 +17,8 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(API_TOKEN)
 dp = Dispatcher()
 
-# хранение текущей анкеты пользователя
-user_current_profile = {}
+# ================== TEMP STATE ==================
+current_profiles = {}  # viewer_id -> profile_id
 
 # ================== KEYBOARDS ==================
 
@@ -31,7 +28,6 @@ def main_menu_kb():
         [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit")]
     ])
 
-
 def like_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -39,7 +35,6 @@ def like_kb():
             InlineKeyboardButton(text="❌", callback_data="dislike")
         ]
     ])
-
 
 def like_response_kb(from_user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -55,42 +50,34 @@ def like_response_kb(from_user_id: int):
         ]
     ])
 
-
 def match_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="✉️ Написать",
-                url=f"tg://user?id={user_id}"
-            )
-        ]
+        [InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={user_id}")]
     ])
 
-# ================== DB HELPERS ==================
+# ================== DB ==================
 
 async def get_next_profile(viewer_id: int):
     async with aiosqlite.connect(DB) as db:
-        cursor = await db.execute("""
+        cur = await db.execute("""
             SELECT id, name, age, city, goal, photo_id
             FROM profiles
             WHERE id != ?
               AND id NOT IN (
-                  SELECT to_user FROM likes WHERE from_user = ?
+                SELECT to_user FROM likes WHERE from_user = ?
               )
             ORDER BY RANDOM()
             LIMIT 1
         """, (viewer_id, viewer_id))
-        return await cursor.fetchone()
-
+        return await cur.fetchone()
 
 async def get_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
-        cursor = await db.execute("""
+        cur = await db.execute("""
             SELECT name, age, city, goal, photo_id
             FROM profiles WHERE id = ?
         """, (user_id,))
-        return await cursor.fetchone()
-
+        return await cur.fetchone()
 
 async def add_like(from_user: int, to_user: int) -> bool:
     async with aiosqlite.connect(DB) as db:
@@ -99,11 +86,11 @@ async def add_like(from_user: int, to_user: int) -> bool:
             (from_user, to_user)
         )
 
-        cursor = await db.execute(
+        cur = await db.execute(
             "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
             (to_user, from_user)
         )
-        match = await cursor.fetchone()
+        match = await cur.fetchone()
         await db.commit()
 
     return bool(match)
@@ -117,9 +104,7 @@ async def start(message: Message):
         "«свойЧеловек» — это про тепло и поддержку.\n\n"
         "Начнём знакомство?",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="давай 🤍", callback_data="browse")]
-            ]
+            inline_keyboard=[[InlineKeyboardButton(text="давай 🤍", callback_data="browse")]]
         )
     )
 
@@ -131,19 +116,15 @@ async def browse(call: CallbackQuery):
 
     if not profile:
         await call.message.answer(
-            "Анкеты закончились 🤍\n"
-            "В вашем городе больше нет новых людей",
+            "Анкеты закончились 🤍\nВ вашем городе больше нет новых людей",
             reply_markup=main_menu_kb()
         )
-        await call.answer()
         return
 
-    user_id, name, age, city, goal, photo_id = profile
+    uid, name, age, city, goal, photo_id = profile
+    current_profiles[call.from_user.id] = uid
 
-    text = (
-        f"{name}, {age} · 📍 {city}\n"
-        f"Цель: {goal}"
-    )
+    text = f"{name}, {age} · 📍 {city}\nЦель: {goal}"
 
     await call.message.answer_photo(
         photo=photo_id,
@@ -151,39 +132,42 @@ async def browse(call: CallbackQuery):
         reply_markup=like_kb()
     )
 
-    # сохраняем текущую анкету
-    user_current_profile[call.from_user.id] = user_id
-
     await call.answer()
 
 # ================== LIKE / DISLIKE ==================
 
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery):
-    to_user_id = user_current_profile.get(call.from_user.id)
-
-    if not to_user_id:
+    to_user = current_profiles.get(call.from_user.id)
+    if not to_user:
         await call.answer()
         return
 
     if call.data == "like":
-        is_match = await add_like(call.from_user.id, to_user_id)
+        is_match = await add_like(call.from_user.id, to_user)
 
-        if not is_match:
+        if is_match:
+            await call.message.answer(
+                "💞 Это взаимно!\nТеперь вы можете написать друг другу",
+                reply_markup=match_kb(to_user)
+            )
+
+            await bot.send_message(
+                to_user,
+                "💞 У вас взаимный лайк!\nМожно начинать общение 🤍",
+                reply_markup=match_kb(call.from_user.id)
+            )
+        else:
             profile = await get_profile(call.from_user.id)
             if profile:
                 name, age, city, goal, photo_id = profile
-                text = (
-                    "🔔 У вас новый лайк 🤍\n\n"
-                    f"{name}, {age}\n"
-                    f"📍 {city}\n"
-                    f"Цель: {goal}"
-                )
-
                 await bot.send_photo(
-                    chat_id=to_user_id,
+                    to_user,
                     photo=photo_id,
-                    caption=text,
+                    caption=(
+                        "🔔 У вас новый лайк 🤍\n\n"
+                        f"{name}, {age}\n📍 {city}\nЦель: {goal}"
+                    ),
                     reply_markup=like_response_kb(call.from_user.id)
                 )
 
