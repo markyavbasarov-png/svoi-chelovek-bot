@@ -283,9 +283,10 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
         if is_match:
             await notify_match(from_user, to_user)
+        else:
+            await notify_like(from_user, to_user)
 
     await show_next_profile(call, state)
-
 async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
         async with aiosqlite.connect(DB) as db:
@@ -297,6 +298,24 @@ async def notify_match(u1: int, u2: int):
 
         await bot.send_message(viewer, "🤍 Кажется, это взаимно")
         await send_profile_card(viewer, profile, match_kb(partner))
+
+async def notify_like(from_user: int, to_user: int):
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+        SELECT user_id, name, age, city, role, goal, about, photo_id
+        FROM users WHERE user_id = ?
+        """, (from_user,))
+        profile = await cur.fetchone()
+
+    if not profile:
+        return
+
+    await bot.send_message(
+        to_user,
+        "💌 Ты кому-то понравился.\n"
+        "Посмотри, может это он или она 🤍"
+    )
+    await send_profile_card(to_user, profile, browse_kb())
 
 # ================== RUN ==================
 async def main():
