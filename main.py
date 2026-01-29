@@ -124,7 +124,6 @@ async def start(message: Message, state: FSMContext):
     )
 
 # ================= MY PROFILE =================
-
 @dp.message(Command("myprofile"))
 async def my_profile(message: Message):
     async with aiosqlite.connect(DB) as db:
@@ -142,14 +141,9 @@ async def my_profile(message: Message):
         )
         return
 
-    # ✅ 1. показываем анкету
+    # ✅ показываем анкету С КНОПКАМИ
     await send_my_profile(message.from_user.id)
 
-    # ✅ 2. кнопки редактирования
-    await message.answer(
-        "Что хочешь изменить?",
-        reply_markup=edit_profile_kb()
-    )
 # ===== CALLBACK HANDLERS =====
 
 @dp.callback_query(F.data == "edit_profile")
@@ -159,7 +153,6 @@ async def edit_profile(call: CallbackQuery, state: FSMContext):
     await call.message.answer(
         "Давай обновим анкету 🤍\nКак тебя зовут?"
     )
-
 
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
@@ -270,20 +263,32 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
         f"{about or ''}"
     )
     if photo_id:
-        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
-    else:
-        await bot.send_message(chat_id, text, reply_markup=kb)
-
+    await bot.send_photo(
+        chat_id=chat_id,
+        photo=photo_id,
+        caption=text,
+        reply_markup=kb   # 🔥 ОБЯЗАТЕЛЬНО
+    )
+else:
+    await bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup=kb
+    )
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users WHERE user_id = ?
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
     if profile:
-        await send_profile_card(user_id, profile, main_menu_kb())
+        await send_profile_card(
+            user_id,
+            profile,
+            edit_profile_kb()  # 🔥 ВОТ ТУТ
+        )
 
 # ================== BROWSE ==================
 @dp.callback_query(F.data == "browse")
