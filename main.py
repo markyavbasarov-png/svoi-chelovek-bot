@@ -82,10 +82,14 @@ def skip_about_kb():
 
 def photo_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
-        [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
+        [
+            InlineKeyboardButton(text="📷 Загрузить фото", callback_data="upload_photo"),
+            InlineKeyboardButton(text="🎥 Загрузить видео", callback_data="upload_video")
+        ],
+        [
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")
+        ]
     ])
-
 def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
@@ -356,13 +360,55 @@ async def cancel_edit(call: CallbackQuery, state: FSMContext):
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
-    await message.answer("Отправь фотографию 🤍")
 
+    await message.answer(
+        "Отправь фотографию или видео 🤍",
+        reply_markup=photo_kb()
+    )
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await state.update_data(photo_id=photo_id)
+    media_id = message.photo[-1].file_id
+
+    await state.update_data(
+        media_id=media_id,
+        media_type="photo"
+    )
+@dp.message(Profile.photo, F.video)
+async def set_video(message: Message, state: FSMContext):
+    media_id = message.video.file_id
+
+    await state.update_data(
+        media_id=media_id,
+        media_type="video"
+    )
+
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+
+@dp.message(Profile.photo, F.video)
+async def set_video(message: Message, state: FSMContext):
+    video_id = message.video.file_id
+    await state.update_data(media_id=video_id, media_type="video")
 
     data = await state.get_data()
     await save_profile(message.from_user.id, data)
@@ -370,21 +416,26 @@ async def set_photo(message: Message, state: FSMContext):
     await state.clear()
     await send_my_profile(message.from_user.id)
 
-
-# 2️⃣ Кнопка "Загрузить фото"
+    
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
-    await call.message.edit_text("Отправь фотографию 🤍")
+    await call.message.edit_text(
+        "Отправь фотографию 🤍",
+        reply_markup=photo_kb()
+    )
     await call.answer()
+    
 
-
-# 3️⃣ Кнопка "Пропустить"
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    data["photo_id"] = None
+    await state.update_data(
+        media_id=None,
+        media_type=None
+    )
 
+    data = await state.get_data()
     await save_profile(call.from_user.id, data)
+
     await state.clear()
     await send_my_profile(call.from_user.id)
     await call.answer()
