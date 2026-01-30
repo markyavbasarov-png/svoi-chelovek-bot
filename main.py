@@ -378,7 +378,7 @@ async def set_photo(message: Message, state: FSMContext):
     await state.clear()
     await send_my_profile(message.from_user.id)
 
-# 1️⃣ Фото
+# 1️⃣ Фото (ОСНОВНОЙ)
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
@@ -407,10 +407,10 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user.id, data)
     await state.clear()
     await send_my_profile(call.from_user.id)
-    
+    await call.answer()
 
 
-# 4️⃣ ❗️ПОСЛЕДНИЙ — fallback
+# 4️⃣ ❗ FALLBACK — ВСЕГДА ПОСЛЕДНИМ
 @dp.message(Profile.photo)
 async def photo_only(message: Message):
     await message.answer(
@@ -419,24 +419,35 @@ async def photo_only(message: Message):
     )
 
 # ================= SAVE =================
-async def save_profile(user, state, photo_id):
-    data = await state.get_data()
+async def save_profile(user_id: int, data: dict):
     async with aiosqlite.connect(DB) as db:
-        await db.execute("""
-        INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user.id,
-            user.username,
-            data["name"],
-            data["age"],
-            data["city"],
-            data["role"],
-            data["goal"],
-            data.get("about"),
-            photo_id
-        ))
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO users (
+                user_id,
+                username,
+                name,
+                age,
+                city,
+                role,
+                goal,
+                about,
+                photo_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                data.get("username"),
+                data.get("name"),
+                data.get("age"),
+                data.get("city"),
+                data.get("role"),
+                data.get("goal"),
+                data.get("about"),
+                data.get("photo_id"),
+            )
+        )
         await db.commit()
-    await state.clear()
 
 # ================= PROFILE RENDER =================
 async def send_profile_card(chat_id: int, profile: tuple, kb):
