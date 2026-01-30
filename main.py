@@ -83,20 +83,25 @@ def photo_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
-
     ])
+
+def edit_profile_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+    ])
+
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
-        
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
-def manage_kb():
+
+def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
         [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="💬 Изменить текст", callback_data="edit_about")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu")]
+        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
     ])
 
 def browse_kb():
@@ -254,39 +259,28 @@ async def save_profile(user, state, photo_id):
     await state.clear()
 
 # ================= PROFILE RENDER =================
+async def send_profile_card(chat_id: int, profile: tuple, kb):
+    uid, name, age, city, role, goal, about, photo_id = profile
+    text = (
+        f"{role} {name}, {age} · 📍 {city}\n"
+        f"🔍: {goal}\n\n"
+        f"{about or ''}"
+    )
+    if photo_id:
+        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
+    else:
+        await bot.send_message(chat_id, text, reply_markup=kb)
+
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-            SELECT name, age, city, role, goal, about, media_id
-            FROM users
-            WHERE user_id = ?
+        SELECT user_id, name, age, city, role, goal, about, photo_id
+        FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
-    if not profile:
-        return
-
-    name, age, city, role, goal, about, media_id = profile
-
-    text = (
-        f"{name}, {age} • 📍 {city}\n"
-        f"🔎 {goal}\n\n"
-        f"{about or ''}"
-    )
-
-    if media_id:
-        await bot.send_photo(
-            user_id,
-            media_id,
-            caption=text,
-            reply_markup=my_profile_kb()
-        )
-    else:
-        await bot.send_message(
-            user_id,
-            text,
-            reply_markup=my_profile_kb()
-        )
+    if profile:
+        await send_profile_card(user_id, profile, edit_profile_kb())
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
@@ -361,7 +355,6 @@ async def notify_match(u1: int, u2: int):
 
         await bot.send_message(viewer, "🤍 Кажется, это взаимно")
         await send_profile_card(viewer, profile, match_kb(partner))
-
 # ================= RUN =================
 async def main():
     await init_db()
