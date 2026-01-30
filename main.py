@@ -89,7 +89,9 @@ def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
         [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
- def manage_kb():
+    ])  
+    
+def manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")],
         [InlineKeyboardButton(text="🖼 Изменить фото", callback_data="edit_photo")],
