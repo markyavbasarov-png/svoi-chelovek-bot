@@ -266,7 +266,7 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
     "это тоже нормально.",
     reply_markup=photo_kb()
 )
-        @dp.callback_query(F.data == "edit_profile")
+@dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery):
     await call.message.edit_caption(
         caption="Что хочешь изменить?",
