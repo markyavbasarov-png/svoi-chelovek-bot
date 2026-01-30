@@ -84,11 +84,17 @@ def photo_kb():
         [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
-
-def edit_profile_kb():
+def manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="💬 Изменить текст", callback_data="edit_about")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu")]
+    ])
+def main_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
     ])
 
 def main_menu_kb():
@@ -149,6 +155,45 @@ async def my_profile(message: Message):
     await send_my_profile(message.from_user.id)
 
 # ================= CALLBACKS =================
+@dp.callback_query(F.data == "manage")
+async def manage_menu(call: CallbackQuery):
+    await call.message.edit_text(
+        "Что хочешь изменить?",
+        reply_markup=manage_kb()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "back_to_menu")
+async def back_to_menu(call: CallbackQuery):
+    await call.message.edit_text(
+        "Меню",
+        reply_markup=main_menu_kb()
+    )
+    await call.answer()
+
+# ====== РЕДАКТИРОВАНИЕ ПРОФИЛЯ ======
+
+@dp.callback_query(F.data == "edit_profile")
+async def edit_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(Profile.name)
+    await call.message.edit_text("Как тебя зовут?")
+
+
+@dp.callback_query(F.data == "edit_photo")
+async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.photo)
+    await call.message.edit_text(
+        "Отправь новое фото 📸",
+        reply_markup=photo_kb()
+    )
+
+
+@dp.callback_query(F.data == "edit_about")
+async def edit_about(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.about)
+    await call.message.edit_text("Напиши но
+
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
     await state.clear()
