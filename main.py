@@ -366,7 +366,7 @@ async def browse_profiles(call: CallbackQuery, state: FSMContext):
     await send_profile_card(call.from_user.id, profile)
 # ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
- async def like_dislike(call: CallbackQuery, state: FSMContext):
+async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await call.message.answer(
     "♥️" if call.data == "like" else "✖️",
