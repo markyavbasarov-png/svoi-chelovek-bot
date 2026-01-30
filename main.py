@@ -288,14 +288,20 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
 
 )
     
-@dp.callback_query(F.data == "cancel_edit")
-async def cancel_edit(call: CallbackQuery, state: FSMContext):
-    await state.clear()
+@dp.callback_query(F.data == "edit_profile")
+async def edit_profile(call: CallbackQuery):
+    await call.answer()
 
-    await call.message.edit_caption(
-        caption="Что хочешь изменить?",
-        reply_markup=edit_profile_menu_kb()
-    )
+    if call.message.photo:
+        await call.message.edit_caption(
+            caption="Что хочешь изменить?",
+            reply_markup=edit_profile_menu_kb()
+        )
+    else:
+        await call.message.edit_text(
+            text="Что хочешь изменить?",
+            reply_markup=edit_profile_menu_kb()
+        )
         
 @dp.callback_query(F.data == "edit_profile_full")
 async def edit_profile_full(call: CallbackQuery, state: FSMContext):
