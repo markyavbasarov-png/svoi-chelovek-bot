@@ -83,6 +83,13 @@ def photo_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
+
+    ])
+def main_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
+        
     ])
 def manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -90,24 +97,6 @@ def manage_kb():
         [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="💬 Изменить текст", callback_data="edit_about")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu")]
-    ])
-def main_menu_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
-    ])
-
-def main_menu_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
-    ])
-
-def my_profile_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
     ])
 
 def browse_kb():
