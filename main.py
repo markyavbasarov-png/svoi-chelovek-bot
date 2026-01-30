@@ -86,10 +86,17 @@ def photo_kb():
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
 
-def edit_profile_kb():
+def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="⚙️ Управление анкетой", callback_data="profile_settings")]
+    ])
+
+def profile_settings_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Редактировать анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile_confirm")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -414,6 +421,17 @@ async def send_my_profile(user_id: int):
             profile,
             edit_profile_kb()
         )
+# ============== DELETE PROFILE ==============
+@dp.callback_query(F.data == "delete_profile_confirm")
+async def delete_profile_confirm(call: CallbackQuery):
+    await call.answer()
+    await call.message.edit_caption(
+        caption=(
+            "Ты уверен, что хочешь удалить анкету?\n\n"
+            "Все данные будут удалены без возможности восстановления 🤍"
+        ),
+        reply_markup=delete_confirm_kb()
+    )
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
