@@ -272,16 +272,17 @@ async def edit_profile(call: CallbackQuery):
         
 @dp.callback_query(F.data == "edit_profile_full")
 async def edit_profile_full(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_reply_markup(reply_markup=None)
     await state.clear()
     await state.set_state(Profile.name)
-    await call.message.answer(
-        "Давай обновим анкету 🤍\nКак тебя зовут?"
-    )
+    await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
 
 @dp.callback_query(F.data == "edit_text")
 async def edit_text(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_reply_markup(reply_markup=None)
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты ✍️")
+    
     
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
