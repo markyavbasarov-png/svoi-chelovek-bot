@@ -409,14 +409,6 @@ async def send_my_profile(user_id: int):
         profile = await cur.fetchone()
 
     if profile:
-        await bot.send_message(
-            user_id,
-            "Вот твоя анкета 🤍\n\n"
-            "Если захочешь —\n"
-            "можно что-то изменить\n"
-            "или просто посмотреть других."
-        )
-
         await send_profile_card(
             user_id,
             profile,
