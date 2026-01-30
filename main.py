@@ -89,16 +89,14 @@ def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
         [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
-    
-    ])
-
-def my_profile_kb():
+ def manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
-    ])
+        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="🖼 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="📝 Изменить текст", callback_data="edit_about")],
+        [InlineKeyboardButton(text="🗑 Удалить аккаунт", callback_data="delete_account")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu")]
+    ])       
 
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -161,6 +159,12 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты 💬")
 
+@dp.callback_query(F.data == "back_to_menu")
+async def back_to_menu(callback: CallbackQuery):
+    await callback.message.edit_reply_markup(
+        reply_markup=main_menu_kb()
+    )
+    await callback.answer()
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
