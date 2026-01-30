@@ -377,7 +377,7 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     if not to_user:
         return
-    if call.data == "like":
+if call.data == "like":
     async with aiosqlite.connect(DB) as db:
         await db.execute(
             "INSERT OR IGNORE INTO likes VALUES (?, ?)",
@@ -391,12 +391,14 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
         reply_markup=view_liker_kb(from_user)
     )
 
-    cur = await db.execute(
-        "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-        (to_user, from_user)
-    )
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
+            (to_user, from_user)
+        )
+        is_match = await cur.fetchone()
 
-    if await cur.fetchone():
+    if is_match:
         await notify_match(from_user, to_user)
 
     await show_next_profile(call, state)
