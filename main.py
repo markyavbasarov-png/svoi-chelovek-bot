@@ -231,8 +231,32 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    await save_profile(message.from_user, state, message.photo[-1].file_id)
+    photo_id = message.photo[-1].file_id
+
+    await state.update_data(
+        media_id=photo_id,
+        media_type="photo"
+    )
+
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
     await send_my_profile(message.from_user.id)
+
+@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await state.update_data(
+        media_id=None,
+        media_type=None
+    )
+
+    data = await state.get_data()
+    await save_profile(call.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(call.from_user.id)
+    await call.answer()
 # ====== МЕНЮ / УПРАВЛЕНИЕ ======
 
 @dp.callback_query(F.data == "manage")
