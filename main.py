@@ -92,6 +92,14 @@ def edit_profile_kb():
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
     ])
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def cancel_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit")]
+        ]
+    )
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
@@ -193,7 +201,10 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
         reply_markup=None
     )
     await state.set_state(Profile.photo)
-    await call.message.answer("Пришли новое фото 📸")
+    await call.message.answer(
+        "Пришли новое фото 📸",
+        reply_markup=cancel_kb()
+    )
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
@@ -281,14 +292,32 @@ async def edit_profile_full(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.name)
     await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
 
-@dp.callback_query(F.data == "edit_text")
+@@dp.callback_query(F.data == "edit_text")
 async def edit_text(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_reply_markup(reply_markup=None)
+    await call.message.edit_caption(
+        caption=call.message.caption,
+        reply_markup=None
+    )
     await state.set_state(Profile.about)
-    await call.message.answer("Напиши новый текст анкеты ✍️")
+    await call.message.answer(
+        "Напиши новый текст анкеты ✍️",
+        reply_markup=cancel_kb()
+    )
+@dp.callback_query(F.data == "cancel_edit")
+async def cancel_edit(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await call.message.delete()
+
+    await send_profile(call.from_user.id)
     
-    
-@dp.message(Profile.about)
+@dp.callback_query(F.data == "cancel_edit")
+async def cancel_edit(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await call.message.delete()
+
+    await send_profile(call.from_user.id)dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
