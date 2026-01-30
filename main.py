@@ -192,7 +192,10 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
-    await call.message.edit_text("Напиши но
+    await call.message.edit_text(
+        "Напиши новый текст о себе 🤍"
+    )
+    await call.answer()
 
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
