@@ -378,13 +378,27 @@ async def set_photo(message: Message, state: FSMContext):
     await state.clear()
     await send_my_profile(message.from_user.id)
 
-@dp.message(Profile.photo)
-async def photo_only(message: Message):
-    await message.answer("Пожалуйста, отправь фотографию 📸")
+# 1️⃣ Фото
+@dp.message(Profile.photo, F.photo)
+async def set_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+    await state.update_data(photo_id=photo_id)
+
+    data = await state.get_data()
+    await save_profile(message.from_user.id, data)
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+
+
+# 2️⃣ Кнопка "Загрузить фото"
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
+    await call.answer()
 
+
+# 3️⃣ Кнопка "Пропустить"
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -392,8 +406,17 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
     await save_profile(call.from_user.id, data)
     await state.clear()
-
     await send_my_profile(call.from_user.id)
+    
+
+
+# 4️⃣ ❗️ПОСЛЕДНИЙ — fallback
+@dp.message(Profile.photo)
+async def photo_only(message: Message):
+    await message.answer(
+        "Я жду фотографию 📸\n"
+        "Или нажми «Пропустить» 🤍"
+    )
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
