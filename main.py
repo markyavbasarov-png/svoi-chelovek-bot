@@ -356,29 +356,9 @@ async def cancel_edit(call: CallbackQuery, state: FSMContext):
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
-    await message.answer(
-        "Добавить фото?",
-        reply_markup=photo_kb()
-    )
-@dp.message(Profile.about)
-async def set_about(message: Message, state: FSMContext):
-    await state.update_data(about=message.text)
-    await state.set_state(Profile.photo)
     await message.answer("Отправь фотографию 🤍")
 
 
-@dp.message(Profile.photo, F.photo)
-async def set_photo(message: Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await state.update_data(photo_id=photo_id)
-
-    data = await state.get_data()
-    await save_profile(message.from_user.id, data)
-
-    await state.clear()
-    await send_my_profile(message.from_user.id)
-
-# 1️⃣ Фото (ОСНОВНОЙ)
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
@@ -450,52 +430,48 @@ async def save_profile(user_id: int, data: dict):
         await db.commit()
 
 # ================= PROFILE RENDER =================
-async def send_profile_card(chat_id: int, profile: tuple, kb):
-    uid, name, age, city, role, goal, about, photo_id = profile
-    text = (
-        f"{role} {name}, {age} · 📍 {city}\n"
-        f"🔍: {goal}\n\n"
-        f"{about or ''}"
-    )
-    if photo_id:
-        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
-    else:
-        await bot.send_message(chat_id, text, reply_markup=kb)
-
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, media_id, media_type
-            FROM users WHERE user_id = ?
+            SELECT name, age, city, role, goal, about, media_id, media_type
+            FROM users
+            WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
-        if not profile:
-            return
+    if not profile:
+        return
 
-        (
-            user_id,
-            name,
-            age,
-            city,
-            role,
-            goal,
-            about,
-            media_id,
-            media_type
-        ) = profile
+    name, age, city, role, goal, about, media_id, media_type = profile
 
-        chat_id = user_id
-        text = f"{name}, {age}\n{city}\n\n{about or ''}"
-        kb = edit_profile_kb()
+    text = (
+        f"{name}, {age} • 📍 {city}\n"
+        f"🔎 {goal}\n\n"
+        f"{about or ''}"
+    )
 
+    if media_id:
         if media_type == "photo":
-            await bot.send_photo(chat_id, media_id, caption=text, reply_markup=kb)
+            await bot.send_photo(
+                user_id,
+                media_id,
+                caption=text,
+                reply_markup=my_profile_kb()
+            )
         elif media_type == "video":
-            await bot.send_video(chat_id, media_id, caption=text, reply_markup=kb)
-        else:
-            await bot.send_message(chat_id, text, reply_markup=kb)
-# ============== DELETE PROFILE ==============
+            await bot.send_video(
+                user_id,
+                media_id,
+                caption=text,
+                reply_markup=my_profile_kb()
+            )
+    else:
+        await bot.send_message(
+            user_id,
+            text,
+            reply_markup=my_profile_kb()
+        )
+# ============== DELETE PROFILE ============
 @dp.callback_query(F.data == "delete_profile_confirm")
 async def delete_profile_confirm(call: CallbackQuery):
     await call.answer()
