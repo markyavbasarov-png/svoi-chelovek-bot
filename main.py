@@ -365,41 +365,38 @@ async def browse_profiles(call: CallbackQuery, state: FSMContext):
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile)
 # ================= LIKES + MATCH =================
-@dp.callback_query(F.data.in_(["like", "dislike"]))
+@router.callback_query(lambda c: c.data in ["like", "dislike"])
 async def like_dislike(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer(
-    "♥️" if call.data == "like" else "✖️",
-)
     data = await state.get_data()
     to_user = data.get("current_profile_id")
     from_user = call.from_user.id
 
     if not to_user:
         return
-if call.data == "like":
-    async with aiosqlite.connect(DB) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO likes VALUES (?, ?)",
-            (from_user, to_user)
+
+    if call.data == "like":
+        async with aiosqlite.connect(DB) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO likes VALUES (?, ?)",
+                (from_user, to_user)
+            )
+            await db.commit()
+
+        await bot.send_message(
+            to_user,
+            "💖 Тебя лайкнули",
+            reply_markup=view_liker_kb(from_user)
         )
-        await db.commit()
 
-    await bot.send_message(
-        to_user,
-        "💖 Тебя лайкнули",
-        reply_markup=view_liker_kb(from_user)
-    )
+        async with aiosqlite.connect(DB) as db:
+            cur = await db.execute(
+                "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
+                (to_user, from_user)
+            )
+            is_match = await cur.fetchone()
 
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-            (to_user, from_user)
-        )
-        is_match = await cur.fetchone()
-
-    if is_match:
-        await notify_match(from_user, to_user)
+        if is_match:
+            await notify_match(from_user, to_user)
 
     await show_next_profile(call, state)
      async def notify_match(u1: int, u2: int):
