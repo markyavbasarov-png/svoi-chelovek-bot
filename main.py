@@ -399,7 +399,7 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
             await notify_match(from_user, to_user)
 
     await show_next_profile(call, state)
-     async def notify_match(u1: int, u2: int):
+async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
         async with aiosqlite.connect(DB) as db:
             cur = await db.execute("""
