@@ -265,7 +265,9 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
     "А если не сейчас —\n"
     "это тоже нормально.",
     reply_markup=photo_kb()
+
 )
+    
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery):
     await call.message.edit_caption(
@@ -274,7 +276,6 @@ async def edit_profile(call: CallbackQuery):
     )
         
 
-    )
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
