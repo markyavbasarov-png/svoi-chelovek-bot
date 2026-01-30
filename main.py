@@ -208,9 +208,15 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_caption(
+        caption=call.message.caption,
+        reply_markup=None
+    )
     await state.set_state(Profile.about)
-    await call.message.answer("Напиши новый текст анкеты 💬")
-
+    await call.message.answer(
+        "Напиши новый текст анкеты ✍️",
+        reply_markup=cancel_kb()
+    )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
@@ -292,7 +298,7 @@ async def edit_profile_full(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.name)
     await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
 
-@@dp.callback_query(F.data == "edit_text")
+@dp.callback_query(F.data == "edit_text")
 async def edit_text(call: CallbackQuery, state: FSMContext):
     await call.message.edit_caption(
         caption=call.message.caption,
@@ -311,18 +317,14 @@ async def cancel_edit(call: CallbackQuery, state: FSMContext):
 
     await send_profile(call.from_user.id)
     
-@dp.callback_query(F.data == "cancel_edit")
-async def cancel_edit(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-
-    await call.message.delete()
-
-    await send_profile(call.from_user.id)dp.message(Profile.about)
+@dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
-    await message.answer("Добавить фото?", reply_markup=photo_kb())
-    
+    await message.answer(
+        "Добавить фото?",
+        reply_markup=photo_kb()
+    )
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
