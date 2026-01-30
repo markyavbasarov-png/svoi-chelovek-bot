@@ -257,48 +257,6 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await send_my_profile(call.from_user.id)
     await call.answer()
-# ====== МЕНЮ / УПРАВЛЕНИЕ ======
-
-@dp.callback_query(F.data == "manage")
-async def manage_menu(call: CallbackQuery):
-    await call.message.edit_text(
-        "Что хочешь изменить?",
-        reply_markup=manage_kb()
-    )
-    await call.answer()
-
-
-@dp.callback_query(F.data == "back_to_menu")
-async def back_to_menu(call: CallbackQuery):
-    await call.message.edit_text(
-        "Меню",
-        reply_markup=main_menu_kb()
-    )
-    await call.answer()
-
-
-# ====== РЕДАКТИРОВАНИЕ ПРОФИЛЯ ======
-
-@dp.callback_query(F.data == "edit_profile")
-async def edit_profile(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await state.set_state(Profile.name)
-    await call.message.edit_text("Как тебя зовут?")
-
-
-@dp.callback_query(F.data == "edit_photo")
-async def edit_photo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.photo)
-    await call.message.edit_text(
-        "Отправь новое фото 📸",
-        reply_markup=photo_kb()
-    )
-
-
-@dp.callback_query(F.data == "edit_about")
-async def edit_about(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.about)
-    await call.message.edit_text("Напиши новый текст о себе 🤍")
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
