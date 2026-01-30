@@ -11,6 +11,7 @@ from aiogram.types import (
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = os.getenv("BOT_TOKEN")
 DB = "db.sqlite3"
@@ -112,6 +113,15 @@ def browse_kb():
         ]
     ])
 
+def view_liker_kb(user_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="👀 Посмотреть анкету",
+                callback_data=f"view_like:{user_id}"
+            )
+        ]
+    ])
 def match_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={user_id}")]
@@ -374,8 +384,13 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
                 "INSERT OR IGNORE INTO likes VALUES (?, ?)",
                 (from_user, to_user)
             )
-            await db.commit()
-
+            await bot.send_message(
+                to_user,
+                "💖 Тебя лайкнули",
+                reply_markup=view_liker_kb(from_user)
+) 
+       
+     )
             cur = await db.execute(
                 "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
                 (to_user, from_user)
