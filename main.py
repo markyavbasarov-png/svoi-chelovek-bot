@@ -377,7 +377,6 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     if not to_user:
         return
-
     if call.data == "like":
     async with aiosqlite.connect(DB) as db:
         await db.execute(
