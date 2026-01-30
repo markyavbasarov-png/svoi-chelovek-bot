@@ -105,6 +105,28 @@ def my_profile_kb():
         [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
     ])
 
+def edit_profile_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="📝 анкету заново",
+                callback_data="edit_full"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📸 Изменить фото",
+                callback_data="edit_photo"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="✏️ текст",
+                callback_data="edit_text"
+            )
+        ]
+    ])
+    
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -244,7 +266,12 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
     "это тоже нормально.",
     reply_markup=photo_kb()
 )
-
+@dp.callback_query(F.data == "edit_profile")
+async def edit_profile(call: CallbackQuery):
+    await call.message.edit_text(
+        "Что хочешь изменить?",
+        reply_markup=edit_profile_menu_kb()
+    )
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
