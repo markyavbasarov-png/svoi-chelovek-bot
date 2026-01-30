@@ -323,12 +323,23 @@ async def edit_text(call: CallbackQuery, state: FSMContext):
     )
 @dp.callback_query(F.data == "cancel_edit")
 async def cancel_edit(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await state.clear()
 
-    await call.message.delete()
-
-    await send_profile(call.from_user.id)
-    
+    if call.message.caption is not None:
+        await call.message.edit_caption(
+            caption="Вот твоя анкета 🤍\n\n"
+                    "Если захочешь — можно что-то изменить\n"
+                    "или просто посмотреть других.",
+            reply_markup=my_profile_kb()
+        )
+    else:
+        await call.message.edit_text(
+            text="Вот твоя анкета 🤍\n\n"
+                 "Если захочешь — можно что-то изменить\n"
+                 "или просто посмотреть других.",
+            reply_markup=my_profile_kb()
+        )
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
