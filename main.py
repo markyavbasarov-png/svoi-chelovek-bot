@@ -469,13 +469,46 @@ async def send_my_profile(user_id: int):
             FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
+if not profile:
+    return
 
-    if profile:
-        await send_profile_card(
-            user_id,
-            profile,
-            edit_profile_kb()
-        )
+(
+    user_id,
+    name,
+    age,
+    city,
+    role,
+    goal,
+    about,
+    media_id,
+    media_type
+) = profile
+
+chat_id = user_id
+text = f"{name}, {age}\n{city}\n\n{about or ''}"
+kb = edit_profile_kb()
+
+if media_type == "photo":
+    await bot.send_photo(
+        chat_id,
+        media_id,
+        caption=text,
+        reply_markup=kb
+    )
+elif media_type == "video":
+    await bot.send_video(
+        chat_id,
+        media_id,
+        caption=text,
+        reply_markup=kb
+    )
+else:
+    await bot.send_message(
+        chat_id,
+        text,
+        reply_markup=kb
+    )
+    
 # ============== DELETE PROFILE ==============
 @dp.callback_query(F.data == "delete_profile_confirm")
 async def delete_profile_confirm(call: CallbackQuery):
