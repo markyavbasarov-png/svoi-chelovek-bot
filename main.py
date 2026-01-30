@@ -272,22 +272,22 @@ async def edit_profile(call: CallbackQuery):
 @dp.callback_query(F.data == "edit_profile_full")
 async def edit_profile_full(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    await state.set_state(ProfileStates.name)
-    await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
+    await state.set_state(Profile.name)
+    await call.message.answer(
+        "Давай обновим анкету 🤍\nКак тебя зовут?"
+    )
 
-
- @dp.callback_query(F.data == "edit_text")
+@dp.callback_query(F.data == "edit_text")
 async def edit_text(call: CallbackQuery, state: FSMContext):
-    await state.set_state(ProfileStates.about)
-    await call.message.answer("Напиши новый текст анкеты ✍️")  
-    
+    await state.set_state(Profile.about)
+    await call.message.answer("Напиши новый текст анкеты ✍️")
     
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
-
+    
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
