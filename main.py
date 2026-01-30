@@ -188,6 +188,10 @@ async def my_profile(message: Message):
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_caption(
+        caption=call.message.caption,
+        reply_markup=None
+    )
     await state.set_state(Profile.photo)
     await call.message.answer("Пришли новое фото 📸")
 
