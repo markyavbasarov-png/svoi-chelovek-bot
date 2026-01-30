@@ -97,7 +97,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 def cancel_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit")]
+            [InlineKeyboardButton(text="⬅️ Отмена", callback_data="cancel_edit")]
         ]
     )
 def main_menu_kb():
@@ -200,19 +200,23 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
         caption=call.message.caption,
         reply_markup=None
     )
+
     await state.set_state(Profile.photo)
+
     await call.message.answer(
         "Пришли новое фото 📸",
         reply_markup=cancel_kb()
     )
 
-@dp.callback_query(F.data == "edit_about")
-async def edit_about(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "edit_text")
+async def edit_text(call: CallbackQuery, state: FSMContext):
     await call.message.edit_caption(
         caption=call.message.caption,
         reply_markup=None
     )
+
     await state.set_state(Profile.about)
+
     await call.message.answer(
         "Напиши новый текст анкеты ✍️",
         reply_markup=cancel_kb()
@@ -284,8 +288,10 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
 
 )
     
-@dp.callback_query(F.data == "edit_profile")
-async def edit_profile(call: CallbackQuery):
+@dp.callback_query(F.data == "cancel_edit")
+async def cancel_edit(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
     await call.message.edit_caption(
         caption="Что хочешь изменить?",
         reply_markup=edit_profile_menu_kb()
