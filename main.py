@@ -109,9 +109,10 @@ def edit_profile_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="📝 анкету заново",
-                callback_data="edit_full"
-            )
+    text="📝 анкету заново",
+    callback_data="edit_profile_full"
+)
+                
         ],
         [
             InlineKeyboardButton(
