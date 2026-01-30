@@ -157,6 +157,22 @@ def match_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={user_id}")]
     ])
+# ========= HELPERS / PROFILE =========
+
+async def send_my_profile(user_id: int):
+    data = await get_profile(user_id)
+
+    await bot.send_photo(
+        chat_id=user_id,
+        photo=data["photo_id"],
+        caption=(
+            "Вот твоя анкета 🤍\n\n"
+            f"{data['name']}, {data['age']} • 📍 {data['city']}\n"
+            f"🔎 {data['goal']}\n\n"
+            f"{data['about']}"
+        ),
+        reply_markup=my_profile_kb()
+    )
 
 # ================== START ==================
 @dp.message(CommandStart())
