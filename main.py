@@ -360,6 +360,34 @@ async def set_about(message: Message, state: FSMContext):
         "Добавить фото?",
         reply_markup=photo_kb()
     )
+ @dp.message(Profile.about)
+async def set_about(message: Message, state: FSMContext):
+    await state.update_data(about=message.text)
+    await state.set_state(Profile.photo)
+    await message.answer("Отправь фотографию 🤍")
+
+
+@dp.message(Profile.photo, F.photo)
+async def set_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+
+    await state.update_data(photo_id=photo_id)
+    await state.clear()
+
+    await message.answer(
+        "Анкета сохранена 🤍\n\n"
+        "Вот как она выглядит:"
+    )
+
+    await send_my_profile(message.from_user.id)
+
+
+@dp.message(Profile.photo)
+async def photo_only(message: Message):
+    await message.answer(
+        "Пожалуйста, отправь фотографию 📸\n"
+        "или нажми «Пропустить»"
+    )   
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
