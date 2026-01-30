@@ -365,7 +365,7 @@ async def browse_profiles(call: CallbackQuery, state: FSMContext):
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile)
 # ================= LIKES + MATCH =================
-@router.callback_query(lambda c: c.data in ["like", "dislike"])
+@dp.callback_query(lambda c: c.data in ["like", "dislike"])
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     to_user = data.get("current_profile_id")
