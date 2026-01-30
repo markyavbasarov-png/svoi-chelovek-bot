@@ -1,3 +1,5 @@
+
+
 import asyncio
 import logging
 import os
@@ -85,20 +87,24 @@ def photo_kb():
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
 
+def edit_profile_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+    ])
+
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="⚙️ Управление", callback_data="manage")]
-    ])  
-    
-def manage_kb():
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
+    ])
+
+def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="🖼 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="📝 Изменить текст", callback_data="edit_about")],
-        [InlineKeyboardButton(text="🗑 Удалить аккаунт", callback_data="delete_account")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu")]
-    ])       
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
+    ])
 
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -161,12 +167,6 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты 💬")
 
-@dp.callback_query(F.data == "back_to_menu")
-async def back_to_menu(callback: CallbackQuery):
-    await callback.message.edit_reply_markup(
-        reply_markup=main_menu_kb()
-    )
-    await callback.answer()
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
@@ -237,32 +237,8 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-
-    await state.update_data(
-        media_id=photo_id,
-        media_type="photo"
-    )
-
-    data = await state.get_data()
-    await save_profile(message.from_user.id, data)
-
-    await state.clear()
+    await save_profile(message.from_user, state, message.photo[-1].file_id)
     await send_my_profile(message.from_user.id)
-
-@dp.callback_query(F.data == "skip_photo", Profile.photo)
-async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await state.update_data(
-        media_id=None,
-        media_type=None
-    )
-
-    data = await state.get_data()
-    await save_profile(call.from_user.id, data)
-
-    await state.clear()
-    await send_my_profile(call.from_user.id)
-    await call.answer()
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
