@@ -185,12 +185,6 @@ async def my_profile(message: Message):
     await send_my_profile(message.from_user.id)
 
 # ================= CALLBACKS =================
-@dp.callback_query(F.data == "edit_profile")
-async def edit_profile(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await state.set_state(Profile.name)
-    await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
-
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
