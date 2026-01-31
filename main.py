@@ -87,7 +87,6 @@ def photo_kb():
 
 def edit_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
     ])
 
@@ -96,13 +95,6 @@ def main_menu_kb():
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
 
-def my_profile_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="💬 Изменить текст анкеты", callback_data="edit_about")]
-    ])
 
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -148,6 +140,29 @@ async def my_profile(message: Message):
 
     await send_my_profile(message.from_user.id)
 
+
+# ================= EDIT PROFILE (MENU) =================
+@dp.message(Command("editprofile"))
+async def edit_profile_menu(message: Message, state: FSMContext):
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT 1 FROM users WHERE user_id = ?",
+            (message.from_user.id,)
+        )
+        exists = await cur.fetchone()
+
+    if not exists:
+        await message.answer(
+            "У тебя ещё нет анкеты 🤍\nДавай создадим?",
+            reply_markup=start_kb()
+        )
+        return
+
+    await state.clear()
+    await state.set_state(Profile.name)
+    await message.answer(
+        "Давай обновим анкету 🤍\n\nКак тебя зовут?"
+    )
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
