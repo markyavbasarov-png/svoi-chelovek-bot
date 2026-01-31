@@ -256,7 +256,7 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await send_profile_card(
         call.from_user.id,
         profile,
-        browse_kb()  # 👀 Смотреть анкеты
+        edit_profile_kb() # 👀 Смотреть анкеты
     )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
