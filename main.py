@@ -280,14 +280,42 @@ async def set_about(message: Message, state: FSMContext):
 async def upload_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
     await call.message.edit_text("Отправь фотографию 🤍")
-# ========= ПРОСМОТР АНКЕТ =========
+# ======== ПРОСМОТР АНКЕТ ========
 @dp.callback_query(F.data == "browse")
-async def view_profiles(callback: CallbackQuery):
-    await callback.answer()
+async def browse(call: CallbackQuery, state: FSMContext):
+    await call.answer()
 
-    await callback.message.answer(
-        "🔍 Ищем анкеты…",
-        reply_markup=browse_kb()
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+        SELECT user_id, name, age, city, role, goal, about, photo_id
+        FROM users
+        WHERE city = (SELECT city FROM users WHERE user_id = ?)
+        AND user_id != ?
+        AND user_id NOT IN (
+            SELECT to_user FROM likes WHERE from_user = ?
+        )
+        LIMIT 1
+        """, (call.from_user.id, call.from_user.id, call.from_user.id))
+
+        profile = await cur.fetchone()
+
+    # ❌ АНКЕТ НЕТ
+    if not profile:
+        await call.message.edit_reply_markup(reply_markup=None)
+        await call.message.answer(
+            "🤍 Пока анкет нет\n\n"
+            "Зайдите чуть позже —\n"
+            "свои люди обязательно появятся"
+        )
+        return
+
+    # ✅ АНКЕТА ЕСТЬ
+    await state.update_data(current_profile_id=profile[0])
+    await call.message.edit_reply_markup(reply_markup=None)
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        browse_kb()
     )
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
