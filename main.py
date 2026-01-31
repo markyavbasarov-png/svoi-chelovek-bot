@@ -192,50 +192,88 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         profile,
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
-# =================== CALLBACKS ====================
+# ================= EDIT PROFILE FSM =================
+class EditProfile(StatesGroup):
+    city = State()
+    about = State()
+    photo = State()
+
+
+# ================= EDIT CALLBACKS =================
+
 @dp.callback_query(F.data == "edit_city")
 async def edit_city(call: CallbackQuery, state: FSMContext):
     await call.answer()
+    await call.message.delete()          # ❗ убираем анкету + кнопки
+    await state.clear()
 
-    # ❌ убираем анкету и меню
-    await call.message.delete()
-
-    # ✅ переходим в режим редактирования города
-    await state.set_state(Profile.city)
-
-    await call.message.answer(
-        "📍 Напиши новый город:"
-    )
+    await state.set_state(EditProfile.city)
+    await call.message.answer("📍 Напиши новый город:")
 
 
-@dp.callback_query(F.data == "edit_photo")
-async def edit_photo(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+@dp.message(EditProfile.city)
+async def save_edit_city(message: Message, state: FSMContext):
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET city = ? WHERE user_id = ?",
+            (message.text, message.from_user.id)
+        )
+        await db.commit()
 
-    # ❌ убираем анкету и меню
-    await call.message.delete()
+    await state.clear()
+    await send_my_profile(message.from_user.id)
 
-    # ✅ переходим в режим редактирования фото
-    await state.set_state(Profile.photo)
 
-    await call.message.answer(
-        "📸 Отправь новое фото:"
-    )
-
+# --------------------------------------------------
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await call.answer()
+    await call.message.delete()          # ❗ убираем анкету + кнопки
+    await state.clear()
 
-    # ❌ убираем анкету и меню
-    await call.message.delete()
+    await state.set_state(EditProfile.about)
+    await call.message.answer("✏️ Напиши новый текст о себе:")
 
-    # ✅ переходим в режим редактирования текста
-    await state.set_state(Profile.about)
 
-    await call.message.answer(
-        "✏️ Напиши новый текст о себе:"
-    )
+@dp.message(EditProfile.about)
+async def save_edit_about(message: Message, state: FSMContext):
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET about = ? WHERE user_id = ?",
+            (message.text, message.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
+
+
+# --------------------------------------------------
+
+@dp.callback_query(F.data == "edit_photo")
+async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await call.message.delete()          # ❗ убираем анкету + кнопки
+    await state.clear()
+
+    await state.set_state(EditProfile.photo)
+    await call.message.answer("📸 Отправь новое фото:")
+
+
+@dp.message(EditProfile.photo, F.photo)
+async def save_edit_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET photo_id = ? WHERE user_id = ?",
+            (photo_id, message.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await send_my_profile(message.from_user.id)
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
     await call.answer()
