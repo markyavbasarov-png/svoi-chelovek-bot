@@ -1,26 +1,25 @@
-import os
 import asyncio
-import logging
-
+import aiosqlite
+import os
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
 from aiogram.filters import Command
+from aiogram.types import (
+    Message, CallbackQuery,
+    InlineKeyboardMarkup, InlineKeyboardButton
+)
 
-logging.basicConfig(level=logging.INFO)
+# ================== НАСТРОЙКИ ==================
 
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN не найден в переменных окружения")
+TOKEN = os.getenv("BOT_TOKEN") or "PASTE_REAL_TOKEN_HERE"
+DB = "bot.db"
 
-bot = Bot(token=TOKEN)
+if TOKEN.startswith("PASTE"):
+    raise RuntimeError("❌ Вставь реальный BOT_TOKEN")
+
+bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# ------------------ БД ------------------
+# ================== БД ==================
 
 async def init_db():
     async with aiosqlite.connect(DB) as db:
@@ -48,7 +47,7 @@ async def init_db():
         """)
         await db.commit()
 
-# ------------------ КНОПКИ ------------------
+# ================== КНОПКИ ==================
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -82,7 +81,7 @@ def delete_confirm_kb():
         ]
     ])
 
-# ------------------ START ------------------
+# ================== START ==================
 
 @dp.message(Command("start"))
 async def start(message: Message):
@@ -91,10 +90,12 @@ async def start(message: Message):
         reply_markup=main_menu_kb()
     )
 
-# ------------------ ПРОФИЛЬ ------------------
+# ================== МОЯ АНКЕТА ==================
 
 @dp.callback_query(F.data == "my_profile")
 async def my_profile(callback: CallbackQuery):
+    await callback.answer()
+
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
             "SELECT name, age, city, about, photo_id FROM users WHERE user_id=?",
@@ -114,14 +115,19 @@ async def my_profile(callback: CallbackQuery):
     else:
         await callback.message.answer(text)
 
-# ------------------ УПРАВЛЕНИЕ ------------------
+# ================== УПРАВЛЕНИЕ ==================
 
 @dp.callback_query(F.data == "manage")
 async def manage(callback: CallbackQuery):
-    await callback.message.edit_text("⚙️ Управление:", reply_markup=manage_kb())
+    await callback.answer()
+    try:
+        await callback.message.edit_text("⚙️ Управление:", reply_markup=manage_kb())
+    except:
+        await callback.message.answer("⚙️ Управление:", reply_markup=manage_kb())
 
 @dp.callback_query(F.data == "delete_confirm")
 async def delete_confirm(callback: CallbackQuery):
+    await callback.answer()
     await callback.message.edit_text(
         "Точно удалить аккаунт?",
         reply_markup=delete_confirm_kb()
@@ -129,6 +135,8 @@ async def delete_confirm(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "delete")
 async def delete_account(callback: CallbackQuery):
+    await callback.answer()
+
     async with aiosqlite.connect(DB) as db:
         await db.execute("DELETE FROM users WHERE user_id=?", (callback.from_user.id,))
         await db.commit()
@@ -138,9 +146,13 @@ async def delete_account(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "back")
 async def back(callback: CallbackQuery):
-    await callback.message.edit_text("Главное меню:", reply_markup=main_menu_kb())
+    await callback.answer()
+    try:
+        await callback.message.edit_text("Главное меню:", reply_markup=main_menu_kb())
+    except:
+        await callback.message.answer("Главное меню:", reply_markup=main_menu_kb())
 
-# ------------------ ПРОСМОТР АНКЕТ ------------------
+# ================== ПРОСМОТР АНКЕТ ==================
 
 async def get_next_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
@@ -157,6 +169,8 @@ async def get_next_profile(user_id: int):
 
 @dp.callback_query(F.data == "browse")
 async def browse(callback: CallbackQuery):
+    await callback.answer()
+
     profile = await get_next_profile(callback.from_user.id)
 
     if not profile:
@@ -174,22 +188,43 @@ async def browse(callback: CallbackQuery):
         await db.commit()
 
     if photo_id:
-        await bot.send_photo(callback.from_user.id, photo_id, caption=text, reply_markup=browse_kb())
+        await bot.send_photo(
+            callback.from_user.id,
+            photo_id,
+            caption=text,
+            reply_markup=browse_kb()
+        )
     else:
         await callback.message.answer(text, reply_markup=browse_kb())
 
-# ------------------ ЛАЙКИ ------------------
+    # сохраняем, кого сейчас смотрим
+    callback.message.conf = {"current_profile": uid}
+
+# ================== ЛАЙКИ ==================
 
 @dp.callback_query(F.data == "like")
 async def like(callback: CallbackQuery):
-    # упрощённый пример
-    await callback.answer("❤️ Лайк отправлен")
+    await callback.answer("❤️ Лайк")
+
+    uid = callback.message.conf.get("current_profile")
+    if not uid:
+        return
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO likes VALUES (?,?)",
+            (callback.from_user.id, uid)
+        )
+        await db.commit()
+
+    await browse(callback)
 
 @dp.callback_query(F.data == "skip")
 async def skip(callback: CallbackQuery):
+    await callback.answer()
     await browse(callback)
 
-# ------------------ ЗАПУСК ------------------
+# ================== ЗАПУСК ==================
 
 async def main():
     await init_db()
