@@ -166,6 +166,35 @@ async def delete_profile(call: CallbackQuery):
         reply_markup=start_kb()
     )
 
+# ================= VIEW PROFILES =================
+@dp.callback_query(F.data == "view_profiles")
+async def view_profiles(call: CallbackQuery):
+    await call.answer()
+
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE city = (SELECT city FROM users WHERE user_id = ?)
+              AND user_id != ?
+            ORDER BY RANDOM()
+            LIMIT 1
+        """, (call.from_user.id, call.from_user.id))
+
+        profile = await cur.fetchone()
+
+    if not profile:
+        await call.message.answer(
+            "🤍 Пока анкет нет.\nЗагляни чуть позже"
+        )
+        return
+
+    await send_profile_card(
+        chat_id=call.from_user.id,
+        profile=profile,
+        kb=browse_kb()
+    )
+
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
