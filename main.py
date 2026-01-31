@@ -355,9 +355,7 @@ async def notify_match(u1: int, u2: int):
 
         await bot.send_message(viewer, "🤍 Кажется, это взаимно")
         await send_profile_card(viewer, profile, match_kb(partner))
-        async def main():
-    await init_db()
-    await dp.start_polling(bot)
+
 # ================= RUN =================
 async def main():
     await init_db()
