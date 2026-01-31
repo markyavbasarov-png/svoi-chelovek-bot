@@ -11,10 +11,6 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 
-# ======================
-# НАСТРОЙКИ
-# ======================
-
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
