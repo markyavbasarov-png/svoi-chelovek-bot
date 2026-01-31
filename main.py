@@ -233,6 +233,9 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
+    # удаляем сообщение с подтверждением
+    await call.message.delete()
+
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
             "SELECT user_id, name, age, city, role, goal, about, photo_id "
