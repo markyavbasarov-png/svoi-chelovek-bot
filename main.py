@@ -90,24 +90,24 @@ def edit_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
     ])
-
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
     ])
+
 def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
         [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
         [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back")], 
     ])
     
 def confirm_delete_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="❌ Нет", callback_data="cancel_delete"),
+            InlineKeyboardButton(text="❌ Нет", callback_data="back"),
             InlineKeyboardButton(text="🗑 Да, удалить", callback_data="confirm_delete")
         ]
     ])
@@ -219,7 +219,17 @@ async def confirm_delete(call: CallbackQuery):
         "🗑 Анкета удалена\n\nХочешь создать новую?",
         reply_markup=start_kb()
     )
-@dp.callback_query(F.data == "cancel_delete")
+
+ @dp.callback_query(F.data == "back")
+async def back_handler(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
+
+    await call.message.answer(
+        "👀 Смотреть анкеты",
+        reply_markup=browse_kb()
+    )
+ @dp.callback_query(F.data == "cancel_delete")
 async def cancel_delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
