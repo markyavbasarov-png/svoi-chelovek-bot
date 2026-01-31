@@ -352,13 +352,13 @@ async def send_my_profile(user_id: int):
             (user_id,)
         )
         profile = await cur.fetchone()
-
-    if profile:
-        await send_profile_card(
-            chat_id=user_id,
-            profile=profile
-        )
-# ================= BROWSE =================
+if profile:
+    await send_profile_card(
+        chat_id=user_id,
+        profile=profile,
+        reply_markup=my_profile_view_kb()
+    )
+# ======================== BROWSE =================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
     await show_next_profile(call, state)
