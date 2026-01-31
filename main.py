@@ -358,14 +358,13 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-# нажали кнопку «Загрузить фото»
-@dp.callback_query(F.data == "upload_photo", Profile.photo)
+#@dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
 
-# 🛑 ЗАЩИТА: если в Profile.photo прислали ТЕКСТ / СТИКЕР / ЧТО УГОДНО, НО НЕ ФОТО
-@dp.message(Profile.photo)
+# ❗ НЕ фото
+@dp.message(Profile.photo, ~F.photo)
 async def photo_text_guard(message: Message):
     await message.answer(
         "📸 Пожалуйста, отправь фотографию\n"
@@ -373,7 +372,8 @@ async def photo_text_guard(message: Message):
         reply_markup=photo_kb()
     )
 
-# ✅ если прислали ФОТО — сохраняем и показываем анкету
+
+# ✅ фото
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(
@@ -382,7 +382,7 @@ async def set_photo(message: Message, state: FSMContext):
         message.photo[-1].file_id
     )
     await send_my_profile(message.from_user.id)
-
+    
 # 🛑 ЗАЩИТА — ЕСЛИ ПРИСЛАЛИ ТЕКСТ
 @dp.message(Profile.photo)
 async def photo_text_guard(message: Message):
