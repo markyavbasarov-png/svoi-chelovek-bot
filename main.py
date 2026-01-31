@@ -87,29 +87,18 @@ def photo_kb():
 
 def my_profile_view_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="👀 Смотреть анкеты",
-            callback_data="browse"
-        )]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="👤 Моя анкета", callback_data="my_profile_menu")]
     ])
 
-
-def manage_kb():
+def my_profile_manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="✍️ Изменить анкету",
-            callback_data="edit_profile"
-        )],
-        [InlineKeyboardButton(
-            text="📸 Изменить фото",
-            callback_data="edit_photo"
-        )],
-        [InlineKeyboardButton(
-            text="💬 Изменить текст анкеты",
-            callback_data="edit_text"
-        )]
+        [InlineKeyboardButton(text="✍️ Изменить анкету", callback_data="edit_profile")],
+        [InlineKeyboardButton(text="💬 Изменить текст", callback_data="edit_text")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
-
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -161,20 +150,7 @@ async def my_profile(message: Message):
         return
 
     await send_my_profile(message.from_user.id)
-
-
-# ========= УПРАВЛЕНИЕ АНКЕТОЙ =========
-@dp.message(Command("manage"))
-async def manage(message: Message):
-    if not await check_profile_exists(message):
-        return
-
-    await message.answer(
-        "⚙️ Управление анкетой",
-        reply_markup=manage_kb()
-    )
-
-
+    
 # ========= ОТПРАВКА МОЕЙ АНКЕТЫ =========
 async def send_my_profile(user_id: int):
     profile = await get_profile(user_id)
@@ -186,6 +162,39 @@ async def send_my_profile(user_id: int):
     )
 
 # ================= CALLBACKS =================
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery):
+    await call.answer()
+    await send_my_profile(call.from_user.id)
+
+@dp.callback_query(F.data == "my_profile_menu")
+async def my_profile_menu(call: CallbackQuery):
+    await call.answer()
+    await call.message.answer(
+        "⚙️ Моя анкета",
+        reply_markup=my_profile_manage_kb()
+    )
+    @dp.callback_query(F.data == "delete_profile")
+async def delete_profile(call: CallbackQuery):
+    await call.answer()
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "DELETE FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
+        await db.execute(
+            "DELETE FROM likes WHERE from_user = ? OR to_user = ?",
+            (call.from_user.id, call.from_user.id)
+        )
+        await db.commit()
+
+    await call.message.answer(
+        "🗑 Анкета удалена\n\n"
+        "Если захочешь — всегда можно создать новую 🤍",
+        reply_markup=start_kb()
+    )
+    
 @dp.callback_query(F.data == "edit_profile")
 async def edit_profile(call: CallbackQuery, state: FSMContext):
     await state.clear()
