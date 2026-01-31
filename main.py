@@ -273,7 +273,6 @@ async def set_goal(call: CallbackQuery, state: FSMContext):
         "Если хочется — расскажите пару слов о себе.",
         reply_markup=skip_about_kb()
     )
-
 @dp.callback_query(F.data == "skip_about", Profile.about)
 async def skip_about(call: CallbackQuery, state: FSMContext):
     await state.update_data(about=None)
@@ -282,17 +281,30 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
         "Если хочется, можно добавить фото 🤍",
         reply_markup=photo_kb()
     )
-
 @dp.message(Profile.about)
 async def set_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await state.set_state(Profile.photo)
-    await message.answer("Добавить фото?", reply_markup=photo_kb())
-
+    await message.answer(
+        "Если хочется, можно добавить фото 🤍",
+        reply_markup=photo_kb()
+    )  
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.photo)
     await call.message.edit_text("Отправь фотографию 🤍")
+
+@dp.message(F.photo, Profile.photo)
+async def set_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+    await save_profile(message.from_user, state, photo_id)
+
+    await message.answer(
+        "🤍 Анкета создана",
+        reply_markup=my_profile_view_kb()
+    )
+
+    await send_my_profile(message.from_user.id)
+    
 # ====== ПРОСМОТР АНКЕТ ======
 @dp.callback_query(F.data == "view_profiles")
 async def view_profiles(call: CallbackQuery, state: FSMContext):
