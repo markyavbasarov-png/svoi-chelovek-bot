@@ -358,10 +358,27 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-@dp.callback_query(F.data == "upload_photo", Profile.photo)
-async def upload_photo(call: CallbackQuery):
-    await call.message.edit_text("Отправь фотографию 🤍")
+@dp.message(Profile.photo, F.photo)
+async def set_photo(message: Message, state: FSMContext):
+    # сохраняем фото
+    photo_id = message.photo[-1].file_id
+    await save_profile(message.from_user, state, photo_id)
 
+    # 🔒 выходим из FSM
+    await state.clear()
+
+    # 🧹 удаляем сообщение "Отправь фотографию"
+    try:
+        await message.bot.delete_message(
+            chat_id=message.chat.id,
+            message_id=message.message_id - 1
+        )
+    except:
+        pass
+
+    # 👤 показываем анкету ОДИН раз
+    await send_my_profile(message.from_user.id)
+    
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
