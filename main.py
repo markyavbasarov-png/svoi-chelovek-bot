@@ -235,7 +235,8 @@ async def set_about(message: Message, state: FSMContext):
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
-async def upload_photo(call: CallbackQuery):
+async def upload_photo(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.photo)
     await call.message.edit_text("Отправь фотографию 🤍")
 
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
@@ -243,11 +244,10 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
     await send_my_profile(call.from_user.id)
 
-@dp.message(Profile.photo, F.photo)
+@dp.message(F.photo, Profile.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(message.from_user, state, message.photo[-1].file_id)
     await send_my_profile(message.from_user.id)
-
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
     data = await state.get_data()
