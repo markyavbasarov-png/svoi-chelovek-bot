@@ -290,7 +290,7 @@ async def send_my_profile(user_id: int):
         profile = await cur.fetchone()
 
     if profile:
-        await send_profile_card(user_id, profile, edit_profile_kb())
+        await send_profile_card(user_id, profile, my_profile_kb())
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
