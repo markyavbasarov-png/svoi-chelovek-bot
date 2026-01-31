@@ -227,16 +227,6 @@ async def go_browse(call: CallbackQuery, state: FSMContext):
     # показываем первую анкету
     await show_next_profile(call.from_user.id)
 
-@dp.callback_query(F.data == "go_browse")
-async def go_browse(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    await call.message.delete()
-    await send_profile_card(...)
-        "👀 Смотреть анкеты",
-        reply_markup=browse_kb()
-    )
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
