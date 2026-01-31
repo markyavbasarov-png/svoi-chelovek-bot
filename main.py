@@ -293,21 +293,22 @@ async def set_about(message: Message, state: FSMContext):
 async def upload_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
     await call.message.edit_text("Отправь фотографию 🤍")
-# ======== ПРОСМОТР АНКЕТ ========
-@dp.callback_query(F.data == "browse")
-async def browse(call: CallbackQuery, state: FSMContext):
+# ====== ПРОСМОТР АНКЕТ ======
+@dp.callback_query(F.data == "view_profiles")
+async def view_profiles(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users
-        WHERE city = (SELECT city FROM users WHERE user_id = ?)
-        AND user_id != ?
-        AND user_id NOT IN (
-            SELECT to_user FROM likes WHERE from_user = ?
-        )
-        LIMIT 1
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE city = (SELECT city FROM users WHERE user_id = ?)
+            AND user_id != ?
+            AND user_id NOT IN (
+                SELECT to_user FROM likes WHERE from_user = ?
+            )
+            ORDER BY RANDOM()
+            LIMIT 1
         """, (call.from_user.id, call.from_user.id, call.from_user.id))
 
         profile = await cur.fetchone()
@@ -316,29 +317,20 @@ async def browse(call: CallbackQuery, state: FSMContext):
     if not profile:
         await call.message.edit_reply_markup(reply_markup=None)
         await call.message.answer(
-            "🤍 Пока анкет нет\n\n"
-            "Зайдите чуть позже —\n"
-            "свои люди обязательно появятся"
+            "🤍 Пока подходящих анкет нет\n\n"
+            "Зайдите чуть позже — свои люди обязательно появятся"
         )
         return
 
     # ✅ АНКЕТА ЕСТЬ
     await state.update_data(current_profile_id=profile[0])
     await call.message.edit_reply_markup(reply_markup=None)
+
     await send_profile_card(
         call.from_user.id,
         profile,
-        browse_kb()
+        browse_kb()  # лайк / дизлайк
     )
-@dp.callback_query(F.data == "skip_photo", Profile.photo)
-async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await save_profile(call.from_user, state, None)
-    await send_my_profile(call.from_user.id)
-
-@dp.message(F.photo, Profile.photo)
-async def set_photo(message: Message, state: FSMContext):
-    await save_profile(message.from_user, state, message.photo[-1].file_id)
-    await send_my_profile(message.from_user.id)
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
     data = await state.get_data()
@@ -420,58 +412,6 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         """, (call.from_user.id, call.from_user.id, call.from_user.id))
         profile = await cur.fetchone()
     
-# ================= LIKES + MATCH =================
-@dp.callback_query(F.data == "view_profiles")
-async def view_profiles(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users
-            WHERE city = (
-                SELECT city FROM users WHERE user_id = ?
-            )
-            AND user_id != ?
-            AND user_id NOT IN (
-                SELECT to_user FROM likes WHERE from_user = ?
-            )
-            ORDER BY RANDOM()
-            LIMIT 1
-        """, (call.from_user.id, call.from_user.id, call.from_user.id))
-
-        profile = await cur.fetchone()
-
-    # ❗ ЕСЛИ АНКЕТ НЕТ
-    if not profile:
-        await call.message.answer(
-            "🤍 Пока подходящих анкет нет\n\n"
-            "Зайдите чуть позже — свои люди обязательно появятся",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="👀 Смотреть анкеты",
-                            callback_data="view_profiles"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="👤 Моя анкета",
-                            callback_data="my_profile_menu"
-                        )
-                    ]
-                ]
-            )
-        )
-        return
-
-    # ✅ ЕСЛИ АНКЕТА НАЙДЕНА
-    await send_profile_card(
-        call.from_user.id,
-        profile,
-        like_dislike_kb(profile[0])
-    )
 # ================= RUN =================
 async def main():
     await init_db()
