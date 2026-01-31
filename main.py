@@ -419,65 +419,59 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         LIMIT 1
         """, (call.from_user.id, call.from_user.id, call.from_user.id))
         profile = await cur.fetchone()
-
-    if not profile:
-    await call.message.answer(
-        "🤍 Пока подходящих анкет нет\n\n"
-        "Зайдите чуть позже — свои люди обязательно появятся ✨",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="👀 Смотреть анкеты",
-                        callback_data="view_profiles"
-                    )
-                ]
-            ]
-        )
-    )
-    return
+    
 # ================= LIKES + MATCH =================
-@dp.callback_query(F.data.in_(["like", "dislike"]))
-async def like_dislike(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "view_profiles")
+async def view_profiles(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await call.message.answer("♥️" if call.data == "like" else "✖️")
 
-    data = await state.get_data()
-    to_user = data.get("current_profile_id")
-    from_user = call.from_user.id
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE city = (
+                SELECT city FROM users WHERE user_id = ?
+            )
+            AND user_id != ?
+            AND user_id NOT IN (
+                SELECT to_user FROM likes WHERE from_user = ?
+            )
+            ORDER BY RANDOM()
+            LIMIT 1
+        """, (call.from_user.id, call.from_user.id, call.from_user.id))
 
-    if not to_user:
+        profile = await cur.fetchone()
+
+    # ❗ ЕСЛИ АНКЕТ НЕТ
+    if not profile:
+        await call.message.answer(
+            "🤍 Пока подходящих анкет нет\n\n"
+            "Зайдите чуть позже — свои люди обязательно появятся",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="👀 Смотреть анкеты",
+                            callback_data="view_profiles"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="👤 Моя анкета",
+                            callback_data="my_profile_menu"
+                        )
+                    ]
+                ]
+            )
+        )
         return
 
-    if call.data == "like":
-        async with aiosqlite.connect(DB) as db:
-            await db.execute(
-                "INSERT OR IGNORE INTO likes VALUES (?, ?)",
-                (from_user, to_user)
-            )
-            await db.commit()
-
-            cur = await db.execute(
-                "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-                (to_user, from_user)
-            )
-            if await cur.fetchone():
-                await notify_match(from_user, to_user)
-
-    await show_next_profile(call, state)
-
-async def notify_match(u1: int, u2: int):
-    for viewer, partner in [(u1, u2), (u2, u1)]:
-        async with aiosqlite.connect(DB) as db:
-            cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
-            """, (partner,))
-            profile = await cur.fetchone()
-
-        await bot.send_message(viewer, "🤍 Кажется, это взаимно")
-        await send_profile_card(viewer, profile, match_kb(partner))
-
+    # ✅ ЕСЛИ АНКЕТА НАЙДЕНА
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        like_dislike_kb(profile[0])
+    )
 # ================= RUN =================
 async def main():
     await init_db()
