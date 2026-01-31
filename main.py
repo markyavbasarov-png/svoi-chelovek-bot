@@ -1,16 +1,27 @@
+import os
 import asyncio
-import aiosqlite
+import logging
+
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command
 from aiogram.types import (
-    Message, CallbackQuery,
-    InlineKeyboardMarkup, InlineKeyboardButton
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
 )
+from aiogram.filters import Command
+
+# ======================
+# НАСТРОЙКИ
+# ======================
+
+logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
-DB = "bot.db"
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не найден в переменных окружения")
 
-bot = Bot(TOKEN)
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # ------------------ БД ------------------
