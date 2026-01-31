@@ -97,9 +97,11 @@ def main_menu_kb():
 
 def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="go_browse")],
+
         [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
         [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="✏️ О себе", callback_data="edit_about")],
         [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
     ])
     
@@ -227,7 +229,16 @@ async def confirm_delete(call: CallbackQuery):
         "🗑 Анкета удалена\n\nХочешь создать новую?",
         reply_markup=start_kb()
     )
+@dp.callback_query(F.data == "go_browse")
+async def go_browse(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
 
+    await call.message.delete()
+    await send_profile_card(...)
+        "👀 Смотреть анкеты",
+        reply_markup=browse_kb()
+    )
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
