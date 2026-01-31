@@ -381,13 +381,38 @@ async def set_photo(message: Message, state: FSMContext):
     
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await save_profile(call.from_user, state, None)
-    await send_my_profile(call.from_user.id)
+    await call.answer()
 
+    # сохраняем профиль без фото
+    await save_profile(call.from_user, state, None)
+
+    # выходим из FSM
+    await state.clear()
+
+    # удаляем сообщение "Добавить фото?"
+    try:
+        await call.message.delete()
+    except:
+        pass
+
+    # показываем анкету ОДИН раз
+    await send_my_profile(call.from_user.id)
+    
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(message.from_user, state, message.photo[-1].file_id)
+
+    # выходим из FSM
+    await state.clear()
+
+    # показываем анкету
     await send_my_profile(message.from_user.id)
+
+@dp.message(Profile.photo)
+async def photo_text_guard(message: Message):
+    await message.answer(
+        "📸 Пожалуйста, отправь фотографию\nили нажми «Пропустить» 👇"
+    )
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
