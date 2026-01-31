@@ -358,25 +358,30 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-# кнопка "Загрузить фото"
+# нажали кнопку «Загрузить фото»
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
 
-# кнопка "Пропустить"
-@dp.callback_query(F.data == "skip_photo", Profile.photo)
-async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await save_profile(call.from_user, state, None)
-    await send_my_profile(call.from_user.id)
+# 🛑 ЗАЩИТА: если в Profile.photo прислали ТЕКСТ / СТИКЕР / ЧТО УГОДНО, НО НЕ ФОТО
+@dp.message(Profile.photo)
+async def photo_text_guard(message: Message):
+    await message.answer(
+        "📸 Пожалуйста, отправь фотографию\n"
+        "или нажми «Пропустить» 👇",
+        reply_markup=photo_kb()
+    )
 
-
-# ✅ ПРИЁМ ФОТО
+# ✅ если прислали ФОТО — сохраняем и показываем анкету
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    await save_profile(message.from_user, state, message.photo[-1].file_id)
+    await save_profile(
+        message.from_user,
+        state,
+        message.photo[-1].file_id
+    )
     await send_my_profile(message.from_user.id)
-
 
 # 🛑 ЗАЩИТА — ЕСЛИ ПРИСЛАЛИ ТЕКСТ
 @dp.message(Profile.photo)
