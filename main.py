@@ -421,17 +421,28 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         profile = await cur.fetchone()
 
     if not profile:
-        await call.message.answer(
-            "💫 Сейчас подходящих анкет нет\n\n"
-            "Новые люди обязательно появятся.\n"
-            "Мы будем здесь и будем ждать 🩶",
-            reply_markup=main_menu_kb()
+    await call.message.answer(
+        "💫 Сейчас подходящих анкет нет\n\n"
+        "Новые люди обязательно появятся.\n"
+        "Мы будем здесь и будем ждать 🤍",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🔄 Смотреть анкеты",
+                        callback_data="view_profiles"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="👤 Моя анкета",
+                        callback_data="my_profile_menu"
+                    )
+                ]
+            ]
         )
-        return
-
-    await state.update_data(current_profile_id=profile[0])
-    await send_profile_card(call.from_user.id, profile, browse_kb())
-
+    )
+    return
 # ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
