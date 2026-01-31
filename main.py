@@ -221,10 +221,12 @@ async def go_browse(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
+    # удаляем сообщение с кнопкой
     await call.message.delete()
 
-    # здесь твоя логика показа первой анкеты из базы
+    # показываем первую анкету
     await show_next_profile(call.from_user.id)
+
 @dp.callback_query(F.data == "go_browse")
 async def go_browse(call: CallbackQuery, state: FSMContext):
     await call.answer()
