@@ -220,7 +220,7 @@ async def confirm_delete(call: CallbackQuery):
         reply_markup=start_kb()
     )
 
- @dp.callback_query(F.data == "back")
+@dp.callback_query(F.data == "back")
 async def back_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
