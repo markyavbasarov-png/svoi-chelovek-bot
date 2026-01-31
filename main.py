@@ -135,12 +135,28 @@ async def my_profile(message: Message):
 
     if not exists:
         await message.answer(
-            "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство?",
+            "Твоя анкета ещё не создана 🤍\nДавай начнём знакомство",
             reply_markup=start_kb()
         )
         return
 
     await send_my_profile(message.from_user.id)
+
+
+async def send_my_profile(user_id: int):
+    profile = await get_profile(user_id)
+
+    await send_profile_card(
+        user_id=user_id,
+        profile=profile,
+        reply_markup=my_profile_view_kb()
+    )
+
+    await bot.send_message(
+        user_id,
+        "Что хочешь сделать дальше? 🤍",
+        reply_markup=main_menu_kb()
+    )
 
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_profile")
