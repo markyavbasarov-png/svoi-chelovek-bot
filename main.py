@@ -363,17 +363,6 @@ async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
 
-# ❗ НЕ фото
-@dp.message(Profile.photo, ~F.photo)
-async def photo_text_guard(message: Message):
-    await message.answer(
-        "📸 Пожалуйста, отправь фотографию\n"
-        "или нажми «Пропустить» 👇",
-        reply_markup=photo_kb()
-    )
-
-
-# ✅ фото
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(
@@ -381,8 +370,19 @@ async def set_photo(message: Message, state: FSMContext):
         state,
         message.photo[-1].file_id
     )
+
+    await state.clear()
     await send_my_profile(message.from_user.id)
-    
+
+
+# ✅@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await save_profile(call.from_user, state, None)
+
+    await state.clear()
+    await send_my_profile(call.from_user.id)
+
+
 # 🛑 ЗАЩИТА — ЕСЛИ ПРИСЛАЛИ ТЕКСТ
 @dp.message(Profile.photo)
 async def photo_text_guard(message: Message):
