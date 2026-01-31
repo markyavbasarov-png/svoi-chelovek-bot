@@ -280,7 +280,15 @@ async def set_about(message: Message, state: FSMContext):
 async def upload_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
     await call.message.edit_text("Отправь фотографию 🤍")
+# ========= ПРОСМОТР АНКЕТ =========
+@dp.callback_query(F.data == "browse")
+async def view_profiles(callback: CallbackQuery):
+    await callback.answer()
 
+    await callback.message.answer(
+        "🔍 Ищем анкеты…",
+        reply_markup=browse_kb()
+    )
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
