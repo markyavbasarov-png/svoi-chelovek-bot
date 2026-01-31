@@ -101,16 +101,25 @@ def edit_menu_kb():
         [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
         [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back")], 
     ])
     
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 def confirm_delete_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="❌ Нет", callback_data="back"),
-            InlineKeyboardButton(text="🗑 Да, удалить", callback_data="confirm_delete")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Вернуться к анкете",
+                    callback_data="back_to_profile"
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Да, удалить",
+                    callback_data="confirm_delete"
+                )
+            ]
         ]
-    ])
+    )
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -181,8 +190,7 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         profile,
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
-# =================== CALLBACKS =====================
-
+# =================== CALLBACKS ====================
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
@@ -220,8 +228,8 @@ async def confirm_delete(call: CallbackQuery):
         reply_markup=start_kb()
     )
 
-@dp.callback_query(F.data == "cancel_delete")
-async def cancel_delete(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
@@ -244,16 +252,6 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
         call.from_user.id,
         profile,
         edit_menu_kb()
-    )
-
-@dp.callback_query(F.data == "back")
-async def back_handler(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    await call.message.answer(
-        "👀 Смотреть анкеты",
-        reply_markup=browse_kb()
     )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
