@@ -84,12 +84,14 @@ def photo_kb():
         [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
-
-def my_profile_view_kb():
+def after_create_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="👤 Моя анкета", callback_data="my_profile_menu")]
+        [InlineKeyboardButton(
+            text="👀 Смотреть анкеты",
+            callback_data="view_profiles"
+        )]
     ])
+
 
 def my_profile_manage_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -292,19 +294,21 @@ async def set_about(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery, state: FSMContext):
     await call.message.edit_text("Отправь фотографию 🤍")
-
+    
 @dp.message(F.photo, Profile.photo)
 async def set_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
     await save_profile(message.from_user, state, photo_id)
 
-    await message.answer(
-        "🤍 Анкета создана",
-        reply_markup=my_profile_view_kb()
-    )
+    await state.clear()  
 
-    await send_my_profile(message.from_user.id)
-    
+    profile = await get_profile(message.from_user.id)
+
+    await send_profile_card(
+        chat_id=message.from_user.id,
+        profile=profile,
+        kb=after_create_kb()
+    )
 # ====== ПРОСМОТР АНКЕТ ======
 @dp.callback_query(F.data == "view_profiles")
 async def view_profiles(call: CallbackQuery, state: FSMContext):
