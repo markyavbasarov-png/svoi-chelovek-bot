@@ -294,21 +294,37 @@ async def set_about(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery, state: FSMContext):
     await call.message.edit_text("Отправь фотографию 🤍")
-    
+
+@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await call.answer()  
+
+    await save_profile(call.from_user, state, photo_id=None)
+
+    await state.clear()
+
+    profile = await get_profile(call.from_user.id)
+    await send_profile_card(
+        chat_id=call.from_user.id,
+        profile=profile,
+        kb=after_create_kb()
+    )
+
+
 @dp.message(F.photo, Profile.photo)
 async def set_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
     await save_profile(message.from_user, state, photo_id)
 
-    await state.clear()  
+    await state.clear()
 
     profile = await get_profile(message.from_user.id)
-
     await send_profile_card(
         chat_id=message.from_user.id,
         profile=profile,
         kb=after_create_kb()
     )
+
 # ====== ПРОСМОТР АНКЕТ ======
 @dp.callback_query(F.data == "view_profiles")
 async def view_profiles(call: CallbackQuery, state: FSMContext):
