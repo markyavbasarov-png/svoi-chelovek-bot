@@ -87,11 +87,7 @@ def photo_kb():
 def my_profile_view_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
-    ])
 
-def my_profile_view_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
 
 def my_profile_kb():
