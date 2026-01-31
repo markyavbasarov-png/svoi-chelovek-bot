@@ -95,7 +95,14 @@ def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
-
+def edit_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
+        [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
+    ])
 
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -147,12 +154,13 @@ async def my_profile(message: Message):
 async def edit_profile_menu(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
-            "SELECT 1 FROM users WHERE user_id = ?",
+            "SELECT user_id, name, age, city, role, goal, about, photo_id "
+            "FROM users WHERE user_id = ?",
             (message.from_user.id,)
         )
-        exists = await cur.fetchone()
+        profile = await cur.fetchone()
 
-    if not exists:
+    if not profile:
         await message.answer(
             "У тебя ещё нет анкеты 🤍\nДавай создадим?",
             reply_markup=start_kb()
@@ -160,17 +168,13 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         return
 
     await state.clear()
-    await state.set_state(Profile.name)
-    await message.answer(
-        "Давай обновим анкету 🤍\n\nКак тебя зовут?"
+
+    await send_profile_card(
+        message.from_user.id,
+        profile,
+        edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # ================= CALLBACKS =================
-@dp.callback_query(F.data == "edit_profile")
-async def edit_profile(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await state.set_state(Profile.name)
-    await call.message.answer("Давай обновим анкету 🤍\nКак тебя зовут?")
-
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
