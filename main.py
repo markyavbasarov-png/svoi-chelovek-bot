@@ -181,7 +181,7 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         profile,
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
-#=================== CALLBACKS =====================
+# =================== CALLBACKS =====================
 
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
