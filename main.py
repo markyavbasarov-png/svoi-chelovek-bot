@@ -161,11 +161,13 @@ async def send_my_profile(user_id: int):
         reply_markup=my_profile_view_kb()
     )
 
-# ================= CALLBACKS =================
+# ============== CALLBACKS ==============
+
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery):
     await call.answer()
     await send_my_profile(call.from_user.id)
+
 
 @dp.callback_query(F.data == "my_profile_menu")
 async def my_profile_menu(call: CallbackQuery):
@@ -174,7 +176,9 @@ async def my_profile_menu(call: CallbackQuery):
         "⚙️ Моя анкета",
         reply_markup=my_profile_manage_kb()
     )
-    @dp.callback_query(F.data == "delete_profile")
+
+
+@dp.callback_query(F.data == "delete_profile")
 async def delete_profile(call: CallbackQuery):
     await call.answer()
 
