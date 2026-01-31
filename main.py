@@ -181,7 +181,8 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         profile,
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
-# ================= CALLBACKS =================
+#=================== CALLBACKS =====================
+
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.photo)
@@ -194,7 +195,6 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "edit_city")
 async def edit_city(call: CallbackQuery, state: FSMContext):
-    await state.clear()
     await state.set_state(Profile.city)
     await call.message.answer("📍 Напиши новый город")
 
@@ -205,9 +205,9 @@ async def ask_delete_confirm(call: CallbackQuery):
         "⚠️ Ты точно хочешь удалить анкету?\n\nЭто действие нельзя отменить.",
         reply_markup=confirm_delete_kb()
     )
+
 @dp.callback_query(F.data == "confirm_delete")
 async def confirm_delete(call: CallbackQuery):
-    await call.answer()
     async with aiosqlite.connect(DB) as db:
         await db.execute(
             "DELETE FROM users WHERE user_id = ?",
@@ -220,16 +220,7 @@ async def confirm_delete(call: CallbackQuery):
         reply_markup=start_kb()
     )
 
-@dp.callback_query(F.data == "back")
-async def back_handler(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    await call.message.answer(
-        "👀 Смотреть анкеты",
-        reply_markup=browse_kb()
-    )
- @dp.callback_query(F.data == "cancel_delete")
+@dp.callback_query(F.data == "cancel_delete")
 async def cancel_delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
@@ -254,30 +245,15 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
         profile,
         edit_menu_kb()
     )
-@dp.callback_query(F.data == "back_to_profile")
-async def back_to_profile(call: CallbackQuery, state: FSMContext):
+
+@dp.callback_query(F.data == "back")
+async def back_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT user_id, name, age, city, role, goal, about, photo_id "
-            "FROM users WHERE user_id = ?",
-            (call.from_user.id,)
-        )
-        profile = await cur.fetchone()
-
-    if not profile:
-        await call.message.answer(
-            "Анкета не найдена 🤍",
-            reply_markup=start_kb()
-        )
-        return
-
-    await send_profile_card(
-        call.from_user.id,
-        profile,
-        edit_menu_kb()
+    await call.message.answer(
+        "👀 Смотреть анкеты",
+        reply_markup=browse_kb()
     )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
