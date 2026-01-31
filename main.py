@@ -103,12 +103,19 @@ def edit_menu_kb():
         [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
-
+    
+def confirm_delete_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="❌ Нет", callback_data="cancel_delete"),
+            InlineKeyboardButton(text="🗑 Да, удалить", callback_data="confirm_delete")
+        ]
+    ])
 def browse_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="♥️", callback_data="like"),
-            InlineKeyboardButton(text="❌", callback_data="dislike")
+            InlineKeyboardButton(text="✖️", callback_data="dislike")
         ]
     ])
 
@@ -184,6 +191,59 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты 💬")
+
+@dp.callback_query(F.data == "edit_city")
+async def edit_city(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(Profile.city)
+    await call.message.answer("📍 Напиши новый город")
+
+@dp.callback_query(F.data == "delete_profile")
+async def ask_delete_confirm(call: CallbackQuery):
+    await call.answer()
+    await call.message.answer(
+        "⚠️ Ты точно хочешь удалить анкету?\n\nЭто действие нельзя отменить.",
+        reply_markup=confirm_delete_kb()
+    )
+@dp.callback_query(F.data == "confirm_delete")
+async def confirm_delete(call: CallbackQuery):
+    await call.answer()
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "DELETE FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
+        await db.commit()
+
+    await call.message.answer(
+        "🗑 Анкета удалена\n\nХочешь создать новую?",
+        reply_markup=start_kb()
+    )
+@dp.callback_query(F.data == "cancel_delete")
+async def cancel_delete(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
+
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT user_id, name, age, city, role, goal, about, photo_id "
+            "FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
+        profile = await cur.fetchone()
+
+    if not profile:
+        await call.message.answer(
+            "Анкета не найдена 🤍",
+            reply_markup=start_kb()
+        )
+        return
+
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        edit_menu_kb()
+    )
 
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
@@ -338,7 +398,7 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await call.message.answer("♥️" if call.data == "like" else "❌")
+    await call.message.answer("♥️" if call.data == "like" else "✖️")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
