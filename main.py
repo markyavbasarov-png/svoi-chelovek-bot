@@ -298,8 +298,11 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    # удаляем сообщение, с которого нажали кнопку
-    await call.message.delete()
+    # ❗ удаляем сообщение, где нажали кнопку "назад"
+    try:
+        await call.message.delete()
+    except:
+        pass
 
     async with aiosqlite.connect(DB) as db:
         cursor = await db.execute(
@@ -318,6 +321,13 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
             reply_markup=start_kb()
         )
         return
+
+    # ✅ показываем ОДНУ актуальную анкету
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        edit_profile_kb()
+    )
 
     await send_profile_card(
         call.from_user.id,
