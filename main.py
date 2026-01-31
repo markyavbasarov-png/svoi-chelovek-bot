@@ -84,14 +84,12 @@ def photo_kb():
         [InlineKeyboardButton(text="📸 Загрузить фото", callback_data="upload_photo")],
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
-
-def edit_profile_kb():
+def my_profile_view_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit_profile")],
-        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
 
-def main_menu_kb():
+def my_profile_view_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
