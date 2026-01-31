@@ -193,21 +193,49 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # =================== CALLBACKS ====================
+@dp.callback_query(F.data == "edit_city")
+async def edit_city(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
+    # ❌ убираем анкету и меню
+    await call.message.delete()
+
+    # ✅ переходим в режим редактирования города
+    await state.set_state(Profile.city)
+
+    await call.message.answer(
+        "📍 Напиши новый город:"
+    )
+
+
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
+    # ❌ убираем анкету и меню
+    await call.message.delete()
+
+    # ✅ переходим в режим редактирования фото
     await state.set_state(Profile.photo)
-    await call.message.answer("Пришли новое фото 📸")
+
+    await call.message.answer(
+        "📸 Отправь новое фото:"
+    )
+
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
+    # ❌ убираем анкету и меню
+    await call.message.delete()
+
+    # ✅ переходим в режим редактирования текста
     await state.set_state(Profile.about)
-    await call.message.answer("Напиши новый текст анкеты 💬")
 
-@dp.callback_query(F.data == "edit_city")
-async def edit_city(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.city)
-    await call.message.answer("📍 Напиши новый город")
-
+    await call.message.answer(
+        "✏️ Напиши новый текст о себе:"
+    )
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
     await call.answer()
