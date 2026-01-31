@@ -244,7 +244,31 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
         profile,
         edit_menu_kb()
     )
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
 
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute(
+            "SELECT user_id, name, age, city, role, goal, about, photo_id "
+            "FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
+        profile = await cur.fetchone()
+
+    if not profile:
+        await call.message.answer(
+            "Анкета не найдена 🤍",
+            reply_markup=start_kb()
+        )
+        return
+
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        edit_menu_kb()
+    )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
