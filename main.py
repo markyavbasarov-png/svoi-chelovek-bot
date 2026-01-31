@@ -422,21 +422,14 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 
     if not profile:
     await call.message.answer(
-        "💫 Сейчас подходящих анкет нет\n\n"
-        "Новые люди обязательно появятся.\n"
-        "Мы будем здесь и будем ждать 🤍",
+        "🤍 Пока подходящих анкет нет\n\n"
+        "Зайдите чуть позже — свои люди обязательно появятся ✨",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="🔄 Смотреть анкеты",
+                        text="👀 Смотреть анкеты",
                         callback_data="view_profiles"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="👤 Моя анкета",
-                        callback_data="my_profile_menu"
                     )
                 ]
             ]
