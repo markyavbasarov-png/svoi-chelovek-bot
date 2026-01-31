@@ -216,19 +216,15 @@ async def ask_delete_confirm(call: CallbackQuery):
         reply_markup=confirm_delete_kb()
     )
 
-@dp.callback_query(F.data == "confirm_delete")
-async def confirm_delete(call: CallbackQuery):
-    async with aiosqlite.connect(DB) as db:
-        await db.execute(
-            "DELETE FROM users WHERE user_id = ?",
-            (call.from_user.id,)
-        )
-        await db.commit()
+@dp.callback_query(F.data == "go_browse")
+async def go_browse(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
 
-    await call.message.answer(
-        "🗑 Анкета удалена\n\nХочешь создать новую?",
-        reply_markup=start_kb()
-    )
+    await call.message.delete()
+
+    # здесь твоя логика показа первой анкеты из базы
+    await show_next_profile(call.from_user.id)
 @dp.callback_query(F.data == "go_browse")
 async def go_browse(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -244,20 +240,23 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    # удаляем сообщение с подтверждением
+    # удаляем сообщение, с которого нажали кнопку
     await call.message.delete()
 
     async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT user_id, name, age, city, role, goal, about, photo_id "
-            "FROM users WHERE user_id = ?",
+        cursor = await db.execute(
+            """
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE user_id = ?
+            """,
             (call.from_user.id,)
         )
-        profile = await cur.fetchone()
+        profile = await cursor.fetchone()
 
     if not profile:
         await call.message.answer(
-            "Анкета не найдена 🤍",
+            "Анкета не найдена 🤍\nДавай создадим новую",
             reply_markup=start_kb()
         )
         return
@@ -265,7 +264,7 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await send_profile_card(
         call.from_user.id,
         profile,
-        edit_menu_kb()
+        browse_kb()  # 👀 Смотреть анкеты
     )
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
