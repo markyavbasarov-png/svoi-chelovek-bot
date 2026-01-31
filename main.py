@@ -358,60 +358,32 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-@dp.message(Profile.photo, F.photo)
-async def set_photo(message: Message, state: FSMContext):
-    # сохраняем фото
-    photo_id = message.photo[-1].file_id
-    await save_profile(message.from_user, state, photo_id)
+# кнопка "Загрузить фото"
+@dp.callback_query(F.data == "upload_photo", Profile.photo)
+async def upload_photo(call: CallbackQuery):
+    await call.message.edit_text("Отправь фотографию 🤍")
 
-    # 🔒 выходим из FSM
-    await state.clear()
 
-    # 🧹 удаляем сообщение "Отправь фотографию"
-    try:
-        await message.bot.delete_message(
-            chat_id=message.chat.id,
-            message_id=message.message_id - 1
-        )
-    except:
-        pass
-
-    # 👤 показываем анкету ОДИН раз
-    await send_my_profile(message.from_user.id)
-    
+# кнопка "Пропустить"
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-
-    # сохраняем профиль без фото
     await save_profile(call.from_user, state, None)
-
-    # выходим из FSM
-    await state.clear()
-
-    # удаляем сообщение "Добавить фото?"
-    try:
-        await call.message.delete()
-    except:
-        pass
-
-    # показываем анкету ОДИН раз
     await send_my_profile(call.from_user.id)
-    
+
+
+# ✅ ПРИЁМ ФОТО
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(message.from_user, state, message.photo[-1].file_id)
-
-    # выходим из FSM
-    await state.clear()
-
-    # показываем анкету
     await send_my_profile(message.from_user.id)
 
+
+# 🛑 ЗАЩИТА — ЕСЛИ ПРИСЛАЛИ ТЕКСТ
 @dp.message(Profile.photo)
 async def photo_text_guard(message: Message):
     await message.answer(
-        "📸 Пожалуйста, отправь фотографию\nили нажми «Пропустить» 👇"
+        "📸 Пожалуйста, отправь фотографию\n"
+        "или нажми «Пропустить» 👇"
     )
 
 # ================= SAVE =================
