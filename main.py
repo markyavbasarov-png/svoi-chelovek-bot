@@ -248,7 +248,51 @@ async def save_edit_about(message: Message, state: FSMContext):
     await state.clear()
     await send_my_profile(message.from_user.id)
 
+# ================== PHOTO STEP ==================
 
+# Кнопка "Загрузить фото"
+@dp.callback_query(F.data == "upload_photo", Profile.photo)
+async def upload_photo(call: CallbackQuery):
+    await call.message.edit_text("Отправь фотографию 🤍")
+
+# 🛑 Защита: если в Profile.photo прислали ТЕКСТ или не фото
+@dp.message(Profile.photo)
+async def photo_text_guard(message: Message):
+    await message.answer(
+        "📸 Пожалуйста, отправь фотографию\n"
+        "или нажми «Пропустить» 👇",
+        reply_markup=photo_kb()
+    )
+
+# ✅ Принимаем фото
+@dp.message(Profile.photo, F.photo)
+async def set_photo(message: Message, state: FSMContext):
+    await save_profile(
+        message.from_user,
+        state,
+        message.photo[-1].file_id
+    )
+    await state.clear()
+
+    await message.answer(
+        "Анкета сохранена 🤍",
+        reply_markup=menu_kb()
+    )
+
+# ⏭ Пропустить фото
+@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await save_profile(
+        call.from_user,
+        state,
+        None
+    )
+    await state.clear()
+
+    await call.message.edit_text(
+        "Анкета сохранена 🤍",
+        reply_markup=menu_kb()
+    )
 # --------------------------------------------------
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
@@ -352,52 +396,6 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
         reply_markup=photo_kb()
     )
 
-# ================== PHOTO STEP ==================
-
-# Кнопка "Загрузить фото"
-@dp.callback_query(F.data == "upload_photo", Profile.photo)
-async def upload_photo(call: CallbackQuery):
-    await call.message.edit_text("Отправь фотографию 🤍")
-
-# 🛑 Защита: если в Profile.photo прислали ТЕКСТ или не фото
-@dp.message(Profile.photo)
-async def photo_text_guard(message: Message):
-    await message.answer(
-        "📸 Пожалуйста, отправь фотографию\n"
-        "или нажми «Пропустить» 👇",
-        reply_markup=photo_kb()
-    )
-
-# ✅ Принимаем фото
-@dp.message(Profile.photo, F.photo)
-async def set_photo(message: Message, state: FSMContext):
-    await save_profile(
-        message.from_user,
-        state,
-        message.photo[-1].file_id
-    )
-    await state.clear()
-
-    await message.answer(
-        "Анкета сохранена 🤍",
-        reply_markup=menu_kb()
-    )
-
-# ⏭ Пропустить фото
-@dp.callback_query(F.data == "skip_photo", Profile.photo)
-async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await save_profile(
-        call.from_user,
-        state,
-        None
-    )
-    await state.clear()
-
-    await call.message.edit_text(
-        "Анкета сохранена 🤍",
-        reply_markup=menu_kb()
-    )
-    )
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
     data = await state.get_data()
