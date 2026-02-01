@@ -52,9 +52,10 @@ class Profile(StatesGroup):
     age = State()
     city = State()
     role = State()
-    goal = State()          # ← создание анкеты
-    edit_goal = State()     # ← РЕДАКТИРОВАНИЕ
-    about = State()
+    goal = State()          # создание
+    edit_goal = State()     # редактирование
+    about = State()         # создание
+    edit_about = State()    # ✅ РЕДАКТИРОВАНИЕ
     photo = State()
 
 # ================== KEYBOARDS ==================
@@ -189,8 +190,8 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.about)
-    await call.message.answer("Напиши новый текст анкеты 💬")
+    await state.set_state(Profile.edit_about)
+    await call.message.answer("Напишите новый текст анкеты ✍️")
 
 @dp.callback_query(F.data == "edit_goal")
 async def edit_goal(call: CallbackQuery, state: FSMContext):
