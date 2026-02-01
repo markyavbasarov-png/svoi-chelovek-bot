@@ -202,7 +202,7 @@ async def edit_age(call: CallbackQuery, state: FSMContext):
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.goal)
     await call.message.answer(
-        "🎯 Что сейчас ближе?",
+        "🎯 наиши новую цель?",
         reply_markup=goal_kb()
     )
 @dp.callback_query(F.data == "edit_city")
