@@ -368,7 +368,12 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    await save_profile(message.from_user, state, message.photo[-1].file_id)
+    photo_id = message.photo[-1].file_id  
+
+    await save_profile(message.from_user, state, photo_id)
+
+    await state.clear()                    
+
     await send_my_profile(message.from_user.id)
 
 # ================= SAVE =================
