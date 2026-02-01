@@ -184,8 +184,9 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # ================= CALLBACKS =================
-@dp.callback_query(F.data == "edit_photo")
+ @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await call.answer()  # ← ВАЖНО
     await state.set_state(Profile.edit_photo)
     await call.message.answer("Пришли новое фото 📸")
 
@@ -203,6 +204,10 @@ async def save_edited_photo(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("📸 Фото обновлено")
     await send_my_profile(message.from_user.id)
+
+@dp.message(Profile.edit_photo)
+async def edit_photo_wrong(message: Message):
+    await message.answer("Пожалуйста, отправь фото 📸, не текст и не файл")
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
