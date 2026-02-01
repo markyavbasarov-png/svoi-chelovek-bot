@@ -71,16 +71,6 @@ def role_kb():
         [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
         [InlineKeyboardButton(text="👼🏼 Будущий родитель", callback_data="role_Будущий")]
     ])
-# ===== КЛАВИАТУРЫ =====
-
-def edit_menu_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Найти своего", callback_data="browse")],
-        [InlineKeyboardButton(text="✏️ Изменить о себе", callback_data="edit_about")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
-        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
-    ])
 
 def goal_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -104,17 +94,18 @@ def edit_profile_kb():
         [InlineKeyboardButton(text="💞 Найти своего ", callback_data="browse")]
     ])
 
-def main_menu_kb():
+def profile_main_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💞 Найти своего ", callback_data="browse")]
+        [InlineKeyboardButton(text="❤️ Найти своего", callback_data="browse")],
+        [InlineKeyboardButton(text="✏️ Изменить анкету", callback_data="open_edit_menu")]
     ])
 def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❤️ Найти своего", callback_data="browse")],
-        [InlineKeyboardButton(text="✏️ Изменить о себе", callback_data="edit_about")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
-        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
+        [InlineKeyboardButton(text="✏️ О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="🎯 Цель", callback_data="edit_goal")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
 def confirm_delete_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -194,6 +185,19 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # ================= CALLBACKS =================
+@dp.callback_query(F.data == "open_edit_menu")
+async def open_edit_menu(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer(
+        "Что вы хотите изменить?",
+        reply_markup=edit_menu_kb()
+    )
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await send_my_profile(call.from_user.id)
+
+
 # 1️⃣ callback — нажали «Изменить фото»
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
@@ -425,7 +429,7 @@ async def send_my_profile(user_id: int):
         profile = await cur.fetchone()
 
     if profile:
-        await send_profile_card(user_id, profile, edit_profile_kb())
+        await send_profile_card(user_id, profile, profile_main_kb())
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
