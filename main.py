@@ -97,12 +97,12 @@ def main_menu_kb():
     ])
 def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
-        [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
-        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
+        [InlineKeyboardButton(text="❤️ Найти своего", callback_data="browse")],
+        [InlineKeyboardButton(text="✏️ Изменить о себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
     ])
-    
 def confirm_delete_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
