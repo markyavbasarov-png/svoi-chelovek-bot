@@ -191,11 +191,13 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
     await call.message.answer("Напиши новый текст анкеты 💬")
 
-@dp.callback_query(F.data == "edit_city")
-async def edit_city(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await state.set_state(Profile.city)
-    await call.message.answer("📍 Напиши новый город")
+@dp.callback_query(F.data == "edit_goal")
+async def edit_goal(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.goal)
+    await call.message.answer(
+        "Напиши новую цель  😏?",
+        reply_markup=goal_kb()
+    )
 
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
