@@ -462,13 +462,13 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         profile = await cur.fetchone()
 
     if not profile:
-    await call.message.answer(
-        "💫 Сейчас подходящих анкет нет\n\n"
-        "Новые люди обязательно появятся.\n"
-        "Мы будем здесь и будем ждать 🩶"
+        await call.message.answer(
+            "💫 Сейчас подходящих анкет нет\n\n"
+            "Новые люди обязательно появятся.\n"
+            "Мы будем здесь и будем ждать 🤍"
     )
-    await send_my_profile(call.from_user.id)
-    return
+        await send_my_profile(call.from_user.id)
+        return
 
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile, browse_kb())
