@@ -101,7 +101,6 @@ def edit_menu_kb():
         [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
         [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
     
 def confirm_delete_kb():
