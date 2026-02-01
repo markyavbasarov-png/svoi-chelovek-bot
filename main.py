@@ -52,7 +52,8 @@ class Profile(StatesGroup):
     age = State()
     city = State()
     role = State()
-    goal = State()
+    goal = State()          # ← создание анкеты
+    edit_goal = State()     # ← РЕДАКТИРОВАНИЕ
     about = State()
     photo = State()
 
@@ -193,12 +194,26 @@ async def edit_about(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "edit_goal")
 async def edit_goal(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.goal)
+    await state.set_state(Profile.edit_goal)
     await call.message.answer(
-        "Напиши новую цель  😏?",
+        "Что вам сейчас ближе?",
         reply_markup=goal_kb()
     )
+@dp.callback_query(F.data.startswith("goal_"), Profile.edit_goal)
+async def update_goal(call: CallbackQuery, state: FSMContext):
+    goal = call.data.replace("goal_", "")
 
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET goal = ? WHERE user_id = ?",
+            (goal, call.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await call.message.answer("🎯 Цель обновлена")
+    await send_my_profile(call.from_user.id)
+    
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
     await call.answer()
@@ -283,18 +298,12 @@ async def set_role(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("goal_"), Profile.goal)
 async def set_goal(call: CallbackQuery, state: FSMContext):
     await state.update_data(goal=call.data.replace("goal_", ""))
-
-    data = await state.get_data()
-    async with aiosqlite.connect(DB) as db:
-        await db.execute(
-            "UPDATE users SET goal = ? WHERE user_id = ?",
-            (data["goal"], call.from_user.id)
-        )
-        await db.commit()
-
-    await state.clear()
-    await call.message.answer("🎯 Цель обновлена")
-    await send_my_profile(call.from_user.id)
+    await state.set_state(Profile.about)
+    await call.message.edit_text(
+        "Здесь ищут не идеальных, а своих 🤍\n\n"
+        "Если хочется — расскажите пару слов о себе.",
+        reply_markup=skip_about_kb()
+    )
 
 @dp.callback_query(F.data == "skip_about", Profile.about)
 async def skip_about(call: CallbackQuery, state: FSMContext):
