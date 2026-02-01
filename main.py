@@ -180,7 +180,7 @@ async def edit_profile_menu(message: Message, state: FSMContext):
     await send_profile_card(
         message.from_user.id,
         profile,
-        edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
+        my_profile_kb()  # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_photo")
