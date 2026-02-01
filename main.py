@@ -298,10 +298,10 @@ async def save_edit_about(message: Message, state: FSMContext):
         )
         await db.commit()
 
-    # выходим из состояния
+    
     await state.clear()
 
-    # загружаем обновлённую анкету
+    
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
             """
@@ -313,11 +313,11 @@ async def save_edit_about(message: Message, state: FSMContext):
         )
         profile = await cur.fetchone()
 
-    # показываем анкету БЕЗ кнопок редактирования
     await send_profile_card(
-    message.from_user.id,
-    profile,
-    my_profile_kb()
+        message.from_user.id,
+        profile,
+    -   my_profile_kb()
+    +   watch_only_kb()
 )
 
 @dp.message(Profile.city)
