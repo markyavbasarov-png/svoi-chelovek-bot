@@ -304,8 +304,11 @@ async def save_edit_about(message: Message, state: FSMContext):
     # загружаем обновлённую анкету
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
-            "SELECT user_id, name, age, city, role, goal, about, photo "
-            "FROM users WHERE user_id = ?",
+            """
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users
+            WHERE user_id = ?
+            """,
             (message.from_user.id,)
         )
         profile = await cur.fetchone()
