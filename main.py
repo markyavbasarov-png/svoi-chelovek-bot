@@ -71,6 +71,16 @@ def role_kb():
         [InlineKeyboardButton(text="👨‍🍼 Папа", callback_data="role_Папа")],
         [InlineKeyboardButton(text="👼🏼 Будущий родитель", callback_data="role_Будущий")]
     ])
+# ===== КЛАВИАТУРЫ =====
+
+def edit_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Найти своего", callback_data="browse")],
+        [InlineKeyboardButton(text="✏️ Изменить о себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
+    ])
 
 def goal_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -238,30 +248,34 @@ async def edit_goal(call: CallbackQuery, state: FSMContext):
         "Напиши новую цель ?",
         reply_markup=goal_kb()
     )
-
-@dp.message(Profile.edit_goal, F.text)
-async def save_edit_goal(message: Message, state: FSMContext):
-    goal = message.text
-
-    if goal not in ["🚶 Прогулки", "💬 Общение"]:
-        await message.answer("Пожалуйста, выбери цель кнопкой 👇")
-        return
-
+@dp.callback_query(F.data == "goal_walk")
+async def goal_walk(call: CallbackQuery, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
         await db.execute(
             "UPDATE users SET goal = ? WHERE user_id = ?",
-            (goal, message.from_user.id)
+            ("Прогулки", call.from_user.id)
         )
         await db.commit()
 
     await state.clear()
+    await call.message.edit_text("🎯 Цель обновлена: Прогулки")
+    await send_my_profile(call.from_user.id)
 
-    await message.answer(
-        "🎯 Цель обновлена",
-        reply_markup=ReplyKeyboardRemove()
-    )
 
-    await send_my_profile(message.from_user.id)
+@dp.callback_query(F.data == "goal_chat")
+async def goal_chat(call: CallbackQuery, state: FSMContext):
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET goal = ? WHERE user_id = ?",
+            ("Общение", call.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await call.message.edit_text("🎯 Цель обновлена: Общение")
+    await send_my_profile(call.from_user.id)
+wait send_my_profile(message.from_user.id)
+
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
     await call.answer()
