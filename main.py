@@ -194,6 +194,18 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         profile,
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
+
+async def edit_current_message(call: CallbackQuery, text: str, kb):
+    if call.message.photo:
+        await call.message.edit_caption(
+            caption=text,
+            reply_markup=kb
+        )
+    else:
+        await call.message.edit_text(
+            text,
+            reply_markup=kb
+        )
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "open_edit_menu")
 async def open_edit_menu(call: CallbackQuery, state: FSMContext):
@@ -208,12 +220,14 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await send_my_profile(call.from_user.id)
 
 
-# 1️⃣ callback — нажали «Изменить фото»
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_photo)
-    await call.message.answer("Пришли новое фото 📸")
-
+    await edit_current_message(
+        call,
+        "📸 Пришлите новое фото",
+        None
+    )
 
 # 2️⃣ если пришло ФОТО — сохраняем
 @dp.message(Profile.edit_photo, F.photo)
@@ -240,7 +254,11 @@ async def edit_photo_wrong(message: Message):
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_about)
-    await call.message.answer("Напишите новый текст анкеты ✍️")
+    await edit_current_message(
+        call,
+        "✏️ Напишите новый текст анкеты",
+        None
+    )
 
 @dp.message(Profile.edit_about)
 async def save_edit_about(message: Message, state: FSMContext):
@@ -258,9 +276,10 @@ async def save_edit_about(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "edit_goal")
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
-    await call.message.answer(
-        "Что вас сейчас ближе ?",
-        reply_markup=goal_kb()
+    await edit_current_message(
+        call,
+        "🎯 Что вам сейчас ближе?",
+        goal_kb()
     )
 @dp.callback_query(F.data.startswith("goal_"), Profile.edit_goal)
 async def edit_goal_save(call: CallbackQuery, state: FSMContext):
@@ -279,10 +298,10 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
-    await call.answer()
-    await call.message.answer(
+    await edit_current_message(
+        call,
         "⚠️ Ты точно хочешь удалить анкету?\n\nЭто действие нельзя отменить.",
-        reply_markup=confirm_delete_kb()
+        confirm_delete_kb()
     )
 @dp.callback_query(F.data == "confirm_delete")
 async def confirm_delete(call: CallbackQuery):
