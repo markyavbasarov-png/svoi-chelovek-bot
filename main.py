@@ -57,6 +57,7 @@ class Profile(StatesGroup):
     about = State()         # создание
     edit_about = State()    # ✅ РЕДАКТИРОВАНИЕ
     photo = State()
+    edit_photo = State()
 
 # ================== KEYBOARDS ==================
 def start_kb():
@@ -185,8 +186,23 @@ async def edit_profile_menu(message: Message, state: FSMContext):
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.photo)
+    await state.set_state(Profile.edit_photo)
     await call.message.answer("Пришли новое фото 📸")
+
+@dp.message(Profile.edit_photo, F.photo)
+async def save_edited_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET photo = ? WHERE user_id = ?",
+            (photo_id, message.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await message.answer("📸 Фото обновлено")
+    await send_my_profile(message.from_user.id)
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
