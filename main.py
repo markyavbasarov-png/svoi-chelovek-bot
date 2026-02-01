@@ -212,18 +212,12 @@ async def save_edited_photo(message: Message, state: FSMContext):
 @dp.message(Profile.edit_photo)
 async def edit_photo_wrong(message: Message):
     await message.answer("Пожалуйста, отправь фото 📸, не текст и не файл")
+    
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_about)
     await call.message.answer("Напишите новый текст анкеты ✍️")
 
-@dp.callback_query(F.data == "edit_goal")
-async def edit_goal(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.edit_goal)
-    await call.message.answer(
-        "Что вам сейчас ближе?",
-        reply_markup=goal_kb()
-    )
 @dp.message(Profile.edit_about)
 async def save_edit_about(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
@@ -235,6 +229,33 @@ async def save_edit_about(message: Message, state: FSMContext):
 
     await state.clear()
     await message.answer("✏️ О себе обновлено")
+    await send_my_profile(message.from_user.id)
+
+@dp.callback_query(F.data == "edit_goal")
+async def edit_goal(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.edit_goal)
+    await call.message.answer(
+        "Что вам сейчас ближе?",
+        reply_markup=goal_kb()
+    )
+
+@dp.message(Profile.edit_goal, F.text)
+async def save_edit_goal(message: Message, state: FSMContext):
+    goal = message.text
+
+    if goal not in ["🚶 Прогулки", "💬 Общение"]:
+        await message.answer("Пожалуйста, выбери цель кнопкой 👇")
+        return
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET goal = ? WHERE user_id = ?",
+            (goal, message.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await message.answer("🎯 Цель обновлена")
     await send_my_profile(message.from_user.id)
     
 @dp.callback_query(F.data == "delete_profile")
