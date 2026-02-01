@@ -261,10 +261,10 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
         return
 
     await send_profile_card(
-        call.from_user.id,
-        profile,
-        edit_menu_kb()
-    )
+    call.from_user.id,
+    profile,
+    my_profile_kb()
+)
 
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
