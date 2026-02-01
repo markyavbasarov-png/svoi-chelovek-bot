@@ -352,29 +352,23 @@ async def skip_about(call: CallbackQuery, state: FSMContext):
         reply_markup=photo_kb()
     )
 
-@dp.message(Profile.about)
-async def set_about(message: Message, state: FSMContext):
-    await state.update_data(about=message.text)
-    await state.set_state(Profile.photo)
-    await message.answer("Добавить фото?", reply_markup=photo_kb())
+# ================== PHOTO STEP ==================
 
-# 📸 нажали кнопку «Загрузить фото»
+# Кнопка "Загрузить фото"
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
-    await call.answer()
     await call.message.edit_text("Отправь фотографию 🤍")
 
+# 🛑 Защита: если в Profile.photo прислали ТЕКСТ или не фото
+@dp.message(Profile.photo)
+async def photo_text_guard(message: Message):
+    await message.answer(
+        "📸 Пожалуйста, отправь фотографию\n"
+        "или нажми «Пропустить» 👇",
+        reply_markup=photo_kb()
+    )
 
-# ⏭ нажали «Пропустить»
-@dp.callback_query(F.data == "skip_photo", Profile.photo)
-async def skip_photo(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await save_profile(call.from_user, state, None)
-    await state.clear()
-    await send_my_profile(call.from_user.id)
-
-
-# 🖼 прислали фото
+# ✅ Принимаем фото
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
     await save_profile(
@@ -383,15 +377,26 @@ async def set_photo(message: Message, state: FSMContext):
         message.photo[-1].file_id
     )
     await state.clear()
-    await send_my_profile(message.from_user.id)
 
-
-# 🛑 если прислали НЕ фото
-@dp.message(Profile.photo)
-async def photo_text_guard(message: Message):
     await message.answer(
-        "📸 Пожалуйста, отправь фотографию\n"
-        "или нажми «Пропустить» 👇"
+        "Анкета сохранена 🤍",
+        reply_markup=menu_kb()
+    )
+
+# ⏭ Пропустить фото
+@dp.callback_query(F.data == "skip_photo", Profile.photo)
+async def skip_photo(call: CallbackQuery, state: FSMContext):
+    await save_profile(
+        call.from_user,
+        state,
+        None
+    )
+    await state.clear()
+
+    await call.message.edit_text(
+        "Анкета сохранена 🤍",
+        reply_markup=menu_kb()
+    )
     )
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
