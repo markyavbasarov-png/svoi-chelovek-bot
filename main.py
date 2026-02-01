@@ -183,7 +183,7 @@ async def edit_profile_menu(message: Message, state: FSMContext):
     await state.clear()
 
     await send_profile_card(
-    call.from_user.id,
+    message.from_user.id,
     profile,
     my_profile_kb()
 )
@@ -315,10 +315,10 @@ async def save_edit_about(message: Message, state: FSMContext):
 
     # показываем анкету БЕЗ кнопок редактирования
     await send_profile_card(
-        message.from_user.id,
-        profile,
-        watch_only_kb()
-    )
+    message.from_user.id,
+    profile,
+    my_profile_kb()
+)
 
 @dp.message(Profile.city)
 async def set_city(message: Message, state: FSMContext):
