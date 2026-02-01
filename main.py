@@ -235,7 +235,7 @@ async def save_edit_about(message: Message, state: FSMContext):
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
     await call.message.answer(
-        "Что вам сейчас ближе?",
+        "напиши новую цель ?",
         reply_markup=goal_kb()
     )
 
