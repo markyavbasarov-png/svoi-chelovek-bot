@@ -235,7 +235,7 @@ async def save_edit_about(message: Message, state: FSMContext):
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
     await call.message.answer(
-        "напиши новую цель ?",
+        "Напиши новую цель ?",
         reply_markup=goal_kb()
     )
 
@@ -255,9 +255,13 @@ async def save_edit_goal(message: Message, state: FSMContext):
         await db.commit()
 
     await state.clear()
-    await message.answer("🎯 Цель обновлена")
+
+    await message.answer(
+        "🎯 Цель обновлена",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
     await send_my_profile(message.from_user.id)
-    
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
     await call.answer()
