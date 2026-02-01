@@ -358,7 +358,7 @@ async def set_about(message: Message, state: FSMContext):
     await state.set_state(Profile.photo)
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
-#@dp.callback_query(F.data == "upload_photo", Profile.photo)
+##@dp.callback_query(F.data == "upload_photo", Profile.photo)
 async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
 
@@ -390,6 +390,7 @@ async def photo_text_guard(message: Message):
         "📸 Пожалуйста, отправь фотографию\n"
         "или нажми «Пропустить» 👇"
     )
+
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
