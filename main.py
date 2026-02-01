@@ -184,19 +184,21 @@ async def edit_profile_menu(message: Message, state: FSMContext):
         edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
     )
 # ================= CALLBACKS =================
- @dp.callback_query(F.data == "edit_photo")
+# 1️⃣ callback — нажали «Изменить фото»
+@dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
-    await call.answer()  # ← ВАЖНО
     await state.set_state(Profile.edit_photo)
     await call.message.answer("Пришли новое фото 📸")
 
+
+# 2️⃣ если пришло ФОТО — сохраняем
 @dp.message(Profile.edit_photo, F.photo)
 async def save_edited_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
 
     async with aiosqlite.connect(DB) as db:
         await db.execute(
-            "UPDATE users SET photo = ? WHERE user_id = ?",
+            "UPDATE users SET photo_id = ? WHERE user_id = ?",
             (photo_id, message.from_user.id)
         )
         await db.commit()
@@ -205,10 +207,11 @@ async def save_edited_photo(message: Message, state: FSMContext):
     await message.answer("📸 Фото обновлено")
     await send_my_profile(message.from_user.id)
 
+
+# 3️⃣ если пришло НЕ фото — объясняем
 @dp.message(Profile.edit_photo)
 async def edit_photo_wrong(message: Message):
     await message.answer("Пожалуйста, отправь фото 📸, не текст и не файл")
-
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_about)
