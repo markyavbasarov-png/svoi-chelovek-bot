@@ -55,10 +55,6 @@ class Profile(StatesGroup):
     goal = State()
     about = State()
     photo = State()
-    edit_about = State()
-    edit_age = State()
-    edit_photo = State()
-    edit_goal = State()
 
 # ================== KEYBOARDS ==================
 def start_kb():
@@ -90,26 +86,24 @@ def photo_kb():
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_photo")]
     ])
 
+def edit_profile_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Смотреть анкеты", callback_data="browse")]
+    ])
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
-def my_profile_kb():
+def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
-        [InlineKeyboardButton(text="📝 Изменить о себе", callback_data="edit_about")],
-        [InlineKeyboardButton(text="🎂 Изменить возраст", callback_data="edit_age")],
-        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
-        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
+        [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
+        [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
     ])
-
-def watch_only_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
-    ])
-
+    
 def confirm_delete_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -183,36 +177,21 @@ async def edit_profile_menu(message: Message, state: FSMContext):
     await state.clear()
 
     await send_profile_card(
-    call.from_user.id,
-    profile,
-    my_profile_kb()
-)
+        message.from_user.id,
+        profile,
+        edit_menu_kb()   # 👈 кнопки: город / фото / о себе / удалить / назад
+    )
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.edit_photo)  
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer("📸 Пришли новое фото")
+    await state.set_state(Profile.photo)
+    await call.message.answer("Пришли новое фото 📸")
 
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.edit_about)  
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer("✍️ Напиши новый текст анкеты")
+    await state.set_state(Profile.about)
+    await call.message.answer("Напиши новый текст анкеты 💬")
 
-@dp.callback_query(F.data == "edit_age")
-async def edit_age(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.edit_age)  
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer("🎂 Напиши новый возраст")
-    
-@dp.callback_query(F.data == "edit_goal")
-async def edit_goal(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.edit_goal)  # ← ВОТ ЭТО
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer("🎯 Что сейчас ближе?",
-        reply_markup=goal_kb()
-    )
 @dp.callback_query(F.data == "edit_city")
 async def edit_city(call: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -287,35 +266,6 @@ async def set_age(message: Message, state: FSMContext):
     await state.update_data(age=int(message.text))
     await state.set_state(Profile.city)
     await message.answer("Из какого ты города?")
-
-@dp.message(Profile.edit_about)
-async def save_edit_about(message: Message, state: FSMContext):
-    # сохраняем текст
-    async with aiosqlite.connect(DB) as db:
-        await db.execute(
-            "UPDATE users SET about = ? WHERE user_id = ?",
-            (message.text, message.from_user.id)
-        )
-        await db.commit()
-
-    # выходим из состояния
-    await state.clear()
-
-    # загружаем обновлённую анкету
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            "SELECT user_id, name, age, city, role, goal, about, photo "
-            "FROM users WHERE user_id = ?",
-            (message.from_user.id,)
-        )
-        profile = await cur.fetchone()
-
-    # показываем анкету БЕЗ кнопок редактирования
-    await send_profile_card(
-        message.from_user.id,
-        profile,
-        watch_only_kb()
-    )
 
 @dp.message(Profile.city)
 async def set_city(message: Message, state: FSMContext):
