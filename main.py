@@ -93,7 +93,7 @@ def edit_profile_kb():
 
 def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👀 Найти своего ", callback_data="browse")]
+        [InlineKeyboardButton(text="💞 Найти своего ", callback_data="browse")]
     ])
 def edit_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
