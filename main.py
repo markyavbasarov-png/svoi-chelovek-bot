@@ -95,13 +95,14 @@ def main_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")]
     ])
-def edit_menu_kb():
+def my_profile_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📍 Город", callback_data="edit_city")],
-        [InlineKeyboardButton(text="📸 Фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="📝 О себе", callback_data="edit_about")],
-        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_profile")]
+        [InlineKeyboardButton(text="👀 Смотреть анкеты", callback_data="browse")],
+        [InlineKeyboardButton(text="📝 Изменить о себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="🎂 Изменить возраст", callback_data="edit_age")],
+        [InlineKeyboardButton(text="📸 Изменить фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="🎯 Изменить цель", callback_data="edit_goal")],
+        [InlineKeyboardButton(text="🗑 Удалить анкету", callback_data="delete_profile")]
     ])
     
 def confirm_delete_kb():
@@ -190,8 +191,20 @@ async def edit_photo(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "edit_about")
 async def edit_about(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.about)
-    await call.message.answer("Напиши новый текст анкеты 💬")
+    await call.message.answer("напиши новый текст анкеты  💬")
 
+@dp.callback_query(F.data == "edit_age")
+async def edit_age(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.age)
+    await call.message.answer("🎂 Напиши новый возраст")
+
+@dp.callback_query(F.data == "edit_goal")
+async def edit_goal(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.goal)
+    await call.message.answer(
+        "🎯 Что сейчас ближе?",
+        reply_markup=goal_kb()
+    )
 @dp.callback_query(F.data == "edit_city")
 async def edit_city(call: CallbackQuery, state: FSMContext):
     await state.clear()
