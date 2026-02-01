@@ -183,7 +183,7 @@ async def edit_profile_menu(message: Message, state: FSMContext):
     await state.clear()
 
     await send_profile_card(
-    message.from_user.id,
+    call.from_user.id,
     profile,
     my_profile_kb()
 )
@@ -261,10 +261,10 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
         return
 
     await send_profile_card(
-    call.from_user.id,
-    profile,
-    my_profile_kb()
-)
+        call.from_user.id,
+        profile,
+        edit_menu_kb()
+    )
 
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
@@ -298,27 +298,24 @@ async def save_edit_about(message: Message, state: FSMContext):
         )
         await db.commit()
 
-    
+    # выходим из состояния
     await state.clear()
 
-    
+    # загружаем обновлённую анкету
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute(
-            """
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users
-            WHERE user_id = ?
-            """,
+            "SELECT user_id, name, age, city, role, goal, about, photo "
+            "FROM users WHERE user_id = ?",
             (message.from_user.id,)
         )
         profile = await cur.fetchone()
 
+    # показываем анкету БЕЗ кнопок редактирования
     await send_profile_card(
         message.from_user.id,
         profile,
-    -   my_profile_kb()
-    +   watch_only_kb()
-)
+        watch_only_kb()
+    )
 
 @dp.message(Profile.city)
 async def set_city(message: Message, state: FSMContext):
@@ -358,24 +355,19 @@ async def set_about(message: Message, state: FSMContext):
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
-async def upload_photo(call: CallbackQuery, state: FSMContext):
+async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
-    
+
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
     await send_my_profile(call.from_user.id)
 
-@dp.message(Profile.photo)
+@dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    if not message.photo:
-        return
-
-    photo_id = message.photo[-1].file_id
-    
-    await save_profile(message.from_user, state, photo_id)
-    await state.clear()
+    await save_profile(message.from_user, state, message.photo[-1].file_id)
     await send_my_profile(message.from_user.id)
+
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
     data = await state.get_data()
