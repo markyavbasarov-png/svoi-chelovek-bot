@@ -199,20 +199,18 @@ async def edit_goal(call: CallbackQuery, state: FSMContext):
         "Что вам сейчас ближе?",
         reply_markup=goal_kb()
     )
-@dp.callback_query(F.data.startswith("goal_"), Profile.edit_goal)
-async def update_goal(call: CallbackQuery, state: FSMContext):
-    goal = call.data.replace("goal_", "")
-
+@dp.message(Profile.edit_about)
+async def save_edit_about(message: Message, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
         await db.execute(
-            "UPDATE users SET goal = ? WHERE user_id = ?",
-            (goal, call.from_user.id)
+            "UPDATE users SET about = ? WHERE user_id = ?",
+            (message.text, message.from_user.id)
         )
         await db.commit()
 
     await state.clear()
-    await call.message.answer("🎯 Цель обновлена")
-    await send_my_profile(call.from_user.id)
+    await message.answer("✏️ О себе обновлено")
+    await send_my_profile(message.from_user.id)
     
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
