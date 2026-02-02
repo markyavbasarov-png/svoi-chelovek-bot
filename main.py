@@ -220,21 +220,6 @@ async def edit_current_message(call: CallbackQuery, text: str, kb):
             reply_markup=kb
         )
 # ================= CALLBACKS =================
-@dp.callback_query(F.data == "open_edit_menu")
-async def open_edit_menu(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    if call.message.photo:
-        await call.message.edit_caption(
-            caption="Что вы хотите изменить?",
-            reply_markup=edit_menu_kb()
-        )
-    else:
-        await call.message.edit_text(
-            "Что вы хотите изменить?",
-            reply_markup=edit_menu_kb()
-        )
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -250,7 +235,7 @@ async def edit_my_profile(message: Message, user_id: int):
         return
 
     text = format_profile_text(profile)
-    kb = main_profile_kb()
+    kb = profile_main_kb()
 
     if message.photo:
         await message.edit_caption(
@@ -263,7 +248,23 @@ async def edit_my_profile(message: Message, user_id: int):
             reply_markup=kb
         )
 
-# 2️⃣ если пришло ФОТО — сохраняем
+
+@dp.callback_query(F.data == "open_edit_menu")
+async def open_edit_menu(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
+
+    if call.message.photo:
+        await call.message.edit_caption(
+            caption="Что вы хотите изменить?",
+            reply_markup=edit_menu_kb()
+        )
+    else:
+        await call.message.edit_text(
+            "Что вы хотите изменить?",
+            reply_markup=edit_menu_kb()
+        )
+
 @dp.message(Profile.edit_photo, F.photo)
 async def save_edited_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
