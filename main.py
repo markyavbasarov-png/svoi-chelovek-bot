@@ -463,6 +463,7 @@ async def send_my_profile(user_id: int):
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await show_next_profile(call, state)
 
 async def show_next_profile(call: CallbackQuery, state: FSMContext):
@@ -478,20 +479,19 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         ORDER BY RANDOM()
         LIMIT 1
         """, (call.from_user.id, call.from_user.id, call.from_user.id))
+
         profile = await cur.fetchone()
-    profile = await cur.fetchone()
 
     if not profile:
         await call.message.answer(
             "😔 Пока подходящих анкет нет\n"
             "Мы сообщим, как только появятся новые 💛",
             reply_markup=no_profiles_kb()
-    )
-    return
+        )
+        return
 
     await state.update_data(current_profile_id=profile[0])
     await send_profile_card(call.from_user.id, profile, browse_kb())
-
 # ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
