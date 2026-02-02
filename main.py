@@ -222,11 +222,19 @@ async def edit_current_message(call: CallbackQuery, text: str, kb):
 # ================= CALLBACKS =================
 @dp.callback_query(F.data == "open_edit_menu")
 async def open_edit_menu(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await state.clear()
-    await call.message.answer(
-        "Что вы хотите изменить?",
-        reply_markup=edit_menu_kb()
-         )
+
+    if call.message.photo:
+        await call.message.edit_caption(
+            caption="Что вы хотите изменить?",
+            reply_markup=edit_menu_kb()
+        )
+    else:
+        await call.message.edit_text(
+            "Что вы хотите изменить?",
+            reply_markup=edit_menu_kb()
+        )
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
