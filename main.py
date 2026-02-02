@@ -226,12 +226,20 @@ async def open_edit_menu(call: CallbackQuery, state: FSMContext):
     await call.message.answer(
         "Что вы хотите изменить?",
         reply_markup=edit_menu_kb()
-    )
+         )
 @dp.callback_query(F.data == "back_to_profile")
 async def back_to_profile(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await state.clear()
-    await send_my_profile(call.from_user.id)
 
+    # 🔒 убираем кнопки у текущего сообщения
+    if call.message.photo:
+        await call.message.edit_caption(reply_markup=None)
+    else:
+        await call.message.edit_reply_markup(reply_markup=None)
+
+    # 👉 показываем анкету
+    await send_my_profile(call.from_user.id)
 
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
