@@ -220,44 +220,29 @@ async def edit_current_message(call: CallbackQuery, text: str, kb):
             reply_markup=kb
         )
 # ================= CALLBACKS =================
-@dp.callback_query(F.data == "back_to_profile")
-async def back_to_profile(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    profile = await get_user_profile(call.from_user.id)
-    if not profile:
-        return
-
-    text = format_profile_text(profile)
-    kb = profile_main_kb()
-
-    if call.message.photo:
-        await call.message.edit_caption(
-            caption=text,
-            reply_markup=kb
-        )
-    else:
-        await call.message.edit_text(
-            text,
-            reply_markup=kb
-        )
 @dp.callback_query(F.data == "open_edit_menu")
 async def open_edit_menu(call: CallbackQuery, state: FSMContext):
-    await call.answer()
     await state.clear()
+    await call.message.answer(
+        "Что вы хотите изменить?",
+        reply_markup=edit_menu_kb()
+    )
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await send_my_profile(call.from_user.id)
 
-    if call.message.photo:
-        await call.message.edit_caption(
-            caption="Что вы хотите изменить?",
-            reply_markup=edit_menu_kb()
-        )
-    else:
-        await call.message.edit_text(
-            "Что вы хотите изменить?",
-            reply_markup=edit_menu_kb()
-        )
 
+@dp.callback_query(F.data == "edit_photo")
+async def edit_photo(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Profile.edit_photo)
+    await edit_current_message(
+        call,
+        "📸 Пришлите новое фото",
+        None
+    )
+
+# 2️⃣ если пришло ФОТО — сохраняем
 @dp.message(Profile.edit_photo, F.photo)
 async def save_edited_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
@@ -546,19 +531,8 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     # ❤️ пользователь лайкнул
     async with aiosqlite.connect(DB) as db:
-
-        # ⛔ проверяем: не лайкал ли уже
-        cur = await db.execute(
-            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-            (from_user, to_user)
-        )
-        if await cur.fetchone():
-            await show_next_profile(call, state)
-            return
-
-        # ✅ пишем лайк
         await db.execute(
-            "INSERT INTO likes (from_user, to_user) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
         )
         await db.commit()
@@ -566,11 +540,10 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
     # 💛 мягкое уведомление лайкнутому
     await notify_soft_like(from_user, to_user)
 
-    # ➡️ следующая анкета
     await show_next_profile(call, state)
 
 
-# 💛 мягкое уведомление о лайке
+# 💛 мягкое уведомление
 async def notify_soft_like(from_user: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -593,7 +566,7 @@ async def notify_soft_like(from_user: int, to_user: int):
     await send_profile_card(
         to_user,
         profile,
-        soft_like_kb(from_user)  # передаём ID лайкнувшего
+        soft_like_kb(from_user)  # 👈 передаём ID лайкнувшего
     )
 
 
@@ -602,11 +575,11 @@ async def notify_soft_like(from_user: int, to_user: int):
 async def soft_like_response(call: CallbackQuery):
     await call.answer()
 
-    # 🔒 убираем кнопки сразу
+    # 🔒 УБИРАЕМ КНОПКИ СРАЗУ (важно!)
     await call.message.edit_reply_markup(reply_markup=None)
 
-    from_user = call.from_user.id          # тот, кто отвечает
-    to_user = int(call.data.split(":")[1]) # тот, кто лайкнул первым
+    from_user = call.from_user.id
+    to_user = int(call.data.split(":")[1])  # ID того, кто лайкнул первым
 
     async with aiosqlite.connect(DB) as db:
         await db.execute(
