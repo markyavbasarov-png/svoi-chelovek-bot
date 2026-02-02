@@ -486,7 +486,6 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         await call.message.answer(
             "😔 Пока подходящих анкет нет\n"
             "Мы сообщим, как только появятся новые 💛",
-            reply_markup=no_profiles_kb()
         )
         return
 
