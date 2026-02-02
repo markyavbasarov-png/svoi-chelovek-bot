@@ -531,8 +531,19 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
 
     # ❤️ пользователь лайкнул
     async with aiosqlite.connect(DB) as db:
+
+        # ⛔ проверяем: не лайкал ли уже
+        cur = await db.execute(
+            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
+            (from_user, to_user)
+        )
+        if await cur.fetchone():
+            await show_next_profile(call, state)
+            return
+
+        # ✅ пишем лайк
         await db.execute(
-            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
+            "INSERT INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
         )
         await db.commit()
@@ -540,10 +551,11 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
     # 💛 мягкое уведомление лайкнутому
     await notify_soft_like(from_user, to_user)
 
+    # ➡️ следующая анкета
     await show_next_profile(call, state)
 
 
-# 💛 мягкое уведомление
+# 💛 мягкое уведомление о лайке
 async def notify_soft_like(from_user: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -566,7 +578,7 @@ async def notify_soft_like(from_user: int, to_user: int):
     await send_profile_card(
         to_user,
         profile,
-        soft_like_kb(from_user)  # 👈 передаём ID лайкнувшего
+        soft_like_kb(from_user)  # передаём ID лайкнувшего
     )
 
 
@@ -575,11 +587,11 @@ async def notify_soft_like(from_user: int, to_user: int):
 async def soft_like_response(call: CallbackQuery):
     await call.answer()
 
-    # 🔒 УБИРАЕМ КНОПКИ СРАЗУ (важно!)
+    # 🔒 убираем кнопки сразу
     await call.message.edit_reply_markup(reply_markup=None)
 
-    from_user = call.from_user.id
-    to_user = int(call.data.split(":")[1])  # ID того, кто лайкнул первым
+    from_user = call.from_user.id          # тот, кто отвечает
+    to_user = int(call.data.split(":")[1]) # тот, кто лайкнул первым
 
     async with aiosqlite.connect(DB) as db:
         await db.execute(
