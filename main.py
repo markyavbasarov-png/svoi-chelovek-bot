@@ -496,9 +496,9 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     if call.data == "like":
-    await call.answer("❤️")
-else:
-    await call.answer("✖️")
+        await call.answer("❤️")
+    else:
+        await call.answer("✖️")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
