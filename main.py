@@ -466,6 +466,7 @@ async def browse(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await show_next_profile(call, state)
 
+
 async def show_next_profile(call: CallbackQuery, state: FSMContext):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -483,38 +484,45 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         profile = await cur.fetchone()
 
     if not profile:
-        await call.message.edit_text(
+        await call.message.answer(
             "😔 Пока подходящих анкет нет\n"
-            "Мы сообщим, как только появятся новые 💛",
+            "Мы сообщим, как только появятся новые 💛"
         )
-        await state.clear()
         return
 
+    # 🔑 КЛЮЧЕВАЯ СТРОКА — ВСЁ ПРАВИЛЬНО
     await state.update_data(current_profile_id=profile[0])
-    await send_profile_card(call.from_user.id, profile, browse_kb())
+
+    await send_profile_card(
+        call.from_user.id,
+        profile,
+        browse_kb()
+    )
 # ================= LIKES + MATCH =================
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
-    if call.data == "like":
-        await call.answer("❤️")
-    else:
-        await call.answer("✖️")
+    # обязательно отвечаем на callback
+    await call.answer("❤️" if call.data == "like" else "✖️")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
     from_user = call.from_user.id
 
+    # если вдруг анкета не выбрана — не молчим
     if not to_user:
+        await call.answer("Анкета не найдена", show_alert=True)
         return
 
+    # если лайк — пишем в БД
     if call.data == "like":
         async with aiosqlite.connect(DB) as db:
             await db.execute(
-                "INSERT OR IGNORE INTO likes VALUES (?, ?)",
+                "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
                 (from_user, to_user)
             )
             await db.commit()
 
+            # проверяем взаимный лайк
             cur = await db.execute(
                 "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
                 (to_user, from_user)
@@ -522,22 +530,28 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
             if await cur.fetchone():
                 await notify_match(from_user, to_user)
 
+    # показываем следующую анкету
     await show_next_profile(call, state)
-
+    
 async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
         async with aiosqlite.connect(DB) as db:
             cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
+                SELECT user_id, name, age, city, role, goal, about, photo_id
+                FROM users
+                WHERE user_id = ?
             """, (partner,))
             profile = await cur.fetchone()
+
+        if not profile:
+            continue
 
         await bot.send_message(
             viewer,
             "🤍 Кажется, вы нашли своего человека\n"
             "Не торопитесь — просто напишите друг другу 🌿"
         )
+
         await asyncio.sleep(0.5)
         await send_profile_card(viewer, profile, match_kb(partner))
 # ================= RUN =================
