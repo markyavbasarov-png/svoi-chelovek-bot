@@ -132,6 +132,19 @@ def browse_kb():
         ]
     ])
 
+def soft_like_kb(from_user_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="❤️ Ответить",
+                callback_data=f"soft_like:{from_user_id}"
+            ),
+            InlineKeyboardButton(
+                text="✖️ Пропустить",
+                callback_data="soft_dislike"
+            )
+        ]
+    ])
 def match_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={user_id}")]
@@ -499,47 +512,104 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         browse_kb()
     )
 # ================= LIKES + MATCH =================
+# ❤️ / ✖️ при просмотре анкеты
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
-    # обязательно отвечаем на callback
     await call.answer("❤️" if call.data == "like" else "✖️")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
     from_user = call.from_user.id
 
-    # если вдруг анкета не выбрана — не молчим
     if not to_user:
-        await call.answer("Анкета не найдена", show_alert=True)
         return
 
-    # если лайк — пишем в БД
-    if call.data == "like":
-        async with aiosqlite.connect(DB) as db:
-            await db.execute(
-                "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
-                (from_user, to_user)
-            )
-            await db.commit()
+    # ❌ дизлайк — просто следующая анкета
+    if call.data == "dislike":
+        await show_next_profile(call, state)
+        return
 
-            # проверяем взаимный лайк
-            cur = await db.execute(
-                "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-                (to_user, from_user)
-            )
-            if await cur.fetchone():
-                await notify_match(from_user, to_user)
+    # ❤️ пользователь лайкнул
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
+            (from_user, to_user)
+        )
+        await db.commit()
 
-    # показываем следующую анкету
+    # 💛 мягкое уведомление лайкнутому
+    await notify_soft_like(from_user, to_user)
+
     await show_next_profile(call, state)
-    
+
+
+# 💛 мягкое уведомление
+async def notify_soft_like(from_user: int, to_user: int):
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users WHERE user_id = ?
+        """, (from_user,))
+        profile = await cur.fetchone()
+
+    if not profile:
+        return
+
+    await bot.send_message(
+        to_user,
+        "💛 Кому-то вы понравились\n"
+        "Возможно, это начало чего-то тёплого"
+    )
+
+    await asyncio.sleep(0.3)
+
+    await send_profile_card(
+        to_user,
+        profile,
+        soft_like_kb(from_user)  # 👈 передаём ID лайкнувшего
+    )
+
+
+# ❤️ / ✖️ ответ на soft-like
+@dp.callback_query(F.data.startswith("soft_like"))
+async def soft_like_response(call: CallbackQuery):
+    await call.answer()
+
+    # 🔒 УБИРАЕМ КНОПКИ СРАЗУ (важно!)
+    await call.message.edit_reply_markup(reply_markup=None)
+
+    from_user = call.from_user.id
+    to_user = int(call.data.split(":")[1])  # ID того, кто лайкнул первым
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
+            (from_user, to_user)
+        )
+        await db.commit()
+
+    # 💞 теперь это МАТЧ
+    await notify_match(from_user, to_user)
+
+    await call.message.edit_text(
+        "🤍 Это взаимно\n"
+        "Теперь можно написать друг другу 🌿"
+    )
+
+
+@dp.callback_query(F.data == "soft_dislike")
+async def soft_dislike(call: CallbackQuery):
+    await call.answer()
+    await call.message.edit_text("🤍 Хорошо, идём дальше")
+
+
+# 💞 матч-уведомление
 async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
         async with aiosqlite.connect(DB) as db:
             cur = await db.execute("""
                 SELECT user_id, name, age, city, role, goal, about, photo_id
-                FROM users
-                WHERE user_id = ?
+                FROM users WHERE user_id = ?
             """, (partner,))
             profile = await cur.fetchone()
 
@@ -548,12 +618,17 @@ async def notify_match(u1: int, u2: int):
 
         await bot.send_message(
             viewer,
-            "🤍 Кажется, вы нашли своего человека\n"
-            "Не торопитесь — просто напишите друг другу 🌿"
+            "🤍 У вас взаимная симпатия\n"
+            "Можно написать друг другу 🌿"
         )
 
-        await asyncio.sleep(0.5)
-        await send_profile_card(viewer, profile, match_kb(partner))
+        await asyncio.sleep(0.3)
+
+        await send_profile_card(
+            viewer,
+            profile,
+            match_kb(partner)
+        )
 # ================= RUN =================
 async def set_commands(bot: Bot):
     commands = [
