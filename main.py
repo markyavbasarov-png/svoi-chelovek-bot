@@ -483,10 +483,11 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         profile = await cur.fetchone()
 
     if not profile:
-        await call.message.answer(
+        await call.message.edit_text(
             "😔 Пока подходящих анкет нет\n"
             "Мы сообщим, как только появятся новые 💛",
         )
+        await state.clear()
         return
 
     await state.update_data(current_profile_id=profile[0])
@@ -495,7 +496,7 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await call.message.answer("♥️" if call.data == "like" else "✖️")
+    await call.answer("♥️") if call.data == "like" else "✖️")
 
     data = await state.get_data()
     to_user = data.get("current_profile_id")
@@ -530,9 +531,13 @@ async def notify_match(u1: int, u2: int):
             """, (partner,))
             profile = await cur.fetchone()
 
-        await bot.send_message(viewer, "🤍 Кажется, это взаимно")
+        await bot.send_message(
+            viewer,
+            "🤍 Кажется, вы нашли своего человека\n"
+            "Не торопитесь — просто напишите друг другу 🌿"
+        )
+        await asyncio.sleep(0.5)
         await send_profile_card(viewer, profile, match_kb(partner))
-
 # ================= RUN =================
 async def set_commands(bot: Bot):
     commands = [
