@@ -225,30 +225,6 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    await edit_my_profile(
-        call.message,
-        call.from_user.id
-    )
-async def edit_my_profile(message: Message, user_id: int):
-    profile = await get_user_profile(user_id)
-    if not profile:
-        return
-
-    text = format_profile_text(profile)
-    kb = profile_main_kb()
-
-    if message.photo:
-        await message.edit_caption(
-            caption=text,
-            reply_markup=kb
-        )
-    else:
-        await message.edit_text(
-            text,
-            reply_markup=kb
-        )
-
-
 @dp.callback_query(F.data == "open_edit_menu")
 async def open_edit_menu(call: CallbackQuery, state: FSMContext):
     await call.answer()
