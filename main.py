@@ -332,7 +332,7 @@ async def edit_goal(call: CallbackQuery, state: FSMContext):
         "🎯 Что вам сейчас ближе?",
         goal_kb()
     )
-@dp.callback_query(F.data.startswith("goal_"), Profile.edit_goal)
+@dp.callback_query(F.data.startswith("goal_"))
 async def edit_goal_save(call: CallbackQuery, state: FSMContext):
     goal = call.data.replace("goal_", "")
 
