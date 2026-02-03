@@ -72,12 +72,17 @@ def role_kb():
         [InlineKeyboardButton(text="👼🏼 Будущий родитель", callback_data="role_Будущий")]
     ])
 
-def goal_kb():
+def goal_create_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_Прогулки")],
-        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_Общение")]
+        [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_create_Прогулки")],
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_create_Общение")]
     ])
 
+def goal_edit_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_edit_Прогулки")],
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_edit_Общение")]
+    ])
 def skip_about_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏭ Пропустить", callback_data="skip_about")]
@@ -332,6 +337,23 @@ async def edit_goal(call: CallbackQuery, state: FSMContext):
         "🎯 Что вам сейчас ближе?",
         goal_kb()
     )
+
+@dp.callback_query(F.data.startswith("goal_edit_"), Profile.edit_goal)
+async def edit_goal_save(call: CallbackQuery, state: FSMContext):
+    goal = call.data.replace("goal_edit_", "")
+
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET goal = ? WHERE user_id = ?",
+            (goal, call.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await call.message.edit_text(f"🎯 Цель обновлена: {goal}")
+    await send_my_profile(call.from_user.id)
+
+
 @dp.callback_query(F.data.startswith("goal_"))
 async def edit_goal_save(call: CallbackQuery, state: FSMContext):
     goal = call.data.replace("goal_", "")
@@ -428,10 +450,13 @@ async def set_role(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.goal)
     await call.message.edit_text("Что вам сейчас ближе?", reply_markup=goal_kb())
 
-@dp.callback_query(F.data.startswith("goal_"), Profile.goal)
+@dp.callback_query(F.data.startswith("goal_create_"), Profile.goal)
 async def set_goal(call: CallbackQuery, state: FSMContext):
-    await state.update_data(goal=call.data.replace("goal_", ""))
+    goal = call.data.replace("goal_create_", "")
+
+    await state.update_data(goal=goal)
     await state.set_state(Profile.about)
+
     await call.message.edit_text(
         "Здесь ищут не идеальных, а своих 🤍\n\n"
         "Если хочется — расскажите пару слов о себе.",
