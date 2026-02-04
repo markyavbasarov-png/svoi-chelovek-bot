@@ -666,7 +666,7 @@ async def soft_like_response(call: CallbackQuery):
         await db.execute(
             "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
-        )
+    )
         await db.commit()
 
     # 💞 теперь это МАТЧ
