@@ -650,30 +650,28 @@ async def notify_soft_like(from_user: int, to_user: int):
         soft_like_kb(from_user)  # 👈 передаём ID лайкнувшего
     )
 
-
-# ❤️ / ✖️ ответ на soft-like
-@dp.callback_query(F.data.startswith("soft_like"))
-async def soft_like_response(call: CallbackQuery):
+@dp.callback_query(F.data.startswith("soft_like:"))
+async def confirm_soft_like(call: CallbackQuery):
     await call.answer()
 
-    # 🔒 УБИРАЕМ КНОПКИ СРАЗУ (важно!)
+    # 🔒 убираем кнопки
     await call.message.edit_reply_markup(reply_markup=None)
 
     from_user = call.from_user.id
-    to_user = int(call.data.split(":")[1])  # ID того, кто лайкнул первым
+    to_user = int(call.data.split(":")[1])
 
     async with aiosqlite.connect(DB) as db:
         await db.execute(
             "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
-    )
+        )
         await db.commit()
 
-    # 💞 теперь это МАТЧ
+    # 💞 теперь это MATCH
     await notify_match(from_user, to_user)
 
     await call.message.edit_text(
-        "🤍 Это взаимно\n"
+        "🤍 Это взаимно!\n"
         "Теперь можно написать друг другу 🌿"
     )
 
