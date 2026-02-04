@@ -356,31 +356,30 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
         await send_my_profile(call.from_user.id)
     
 # ================= DELETE PROFILE =================
-@dp.callback_query(F.data == "delete_profile")
-async def ask_delete_confirm(call: CallbackQuery):
+@dp@dp.callback_query(F.data == "confirm_delete")
+async def confirm_delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await edit_current_message(
-        call,
-        "⚠️ Ты точно хочешь удалить анкету?\n\nЭто действие нельзя отменить.",
-        confirm_delete_kb()
-    )
+    await state.clear()
 
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "DELETE FROM likes WHERE from_user = ? OR to_user = ?",
+            (call.from_user.id, call.from_user.id)
+        )
+        await db.execute(
+            "DELETE FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
+        await db.commit()
 
-async with aiosqlite.connect(DB) as db:
-    await db.execute(
-        "DELETE FROM likes WHERE from_user = ? OR to_user = ?",
-        (call.from_user.id, call.from_user.id)
-    )
-    await db.execute(
-        "DELETE FROM users WHERE user_id = ?",
-        (call.from_user.id,)
-    )
-    await db.commit()
-
-    # 🔥 ВАЖНО: редактируем текущее сообщение
     if call.message.photo:
         await call.message.edit_caption(
             caption="🗑 Анкета удалена\n\nХочешь создать новую?",
+            reply_markup=start_kb()
+        )
+    else:
+        await call.message.edit_text(
+            "🗑 Анкета удалена\n\nХочешь создать новую?",
             reply_markup=start_kb()
         )
     else:
