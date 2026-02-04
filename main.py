@@ -349,9 +349,8 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
         )
         await db.commit()
 
-    await state.clear()
-    await call.message.edit_text(f"🎯 Цель обновлена: {goal}")
-    await send_my_profile(call.from_user.id)
+        await state.clear()
+        await send_my_profile(call.from_user.id)
     
 @dp.callback_query(F.data == "delete_profile")
 async def ask_delete_confirm(call: CallbackQuery):
@@ -428,12 +427,17 @@ async def set_city(message: Message, state: FSMContext):
     await state.set_state(Profile.role)
     await message.answer("Кто ты сейчас?", reply_markup=role_kb())
 
-@dp.callback_query(F.data.startswith("goal_create_"), Profile.goal)
-async def set_goal(call: CallbackQuery, state: FSMContext):
-    ...
-    await state.update_data(role=call.data.replace("role_", ""))
+@dp.callback_query(F.data.startswith("role_"), Profile.role)
+async def set_role(call: CallbackQuery, state: FSMContext):
+    role = call.data.replace("role_", "")
+
+    await state.update_data(role=role)
     await state.set_state(Profile.goal)
-    await call.message.edit_text("Что вам сейчас ближе?", reply_markup=goal_kb())
+
+    await call.message.edit_text(
+        "🎯 Что вам сейчас ближе?",
+        reply_markup=goal_create_kb()
+    )
 
 @dp.callback_query(F.data.startswith("goal_create_"), Profile.goal)
 async def set_goal(call: CallbackQuery, state: FSMContext):
