@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# ================== DATABASE ==================
+# ================== DATABASE =================
 async def init_db():
     async with aiosqlite.connect(DB) as db:
         await db.execute("""
