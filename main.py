@@ -240,42 +240,39 @@ async def open_edit_menu(call: CallbackQuery, state: FSMContext):
             "Что вы хотите изменить?",
             reply_markup=edit_menu_kb()
         )
-@dp.callback_query(F.data == "back_to_profile")
-async def back_to_profile(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "cancel_delete")
+async def cancel_delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
     async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
-        """, (call.from_user.id,))
+        cur = await db.execute(
+            "SELECT user_id, name, age, city, role, goal, about, photo_id "
+            "FROM users WHERE user_id = ?",
+            (call.from_user.id,)
+        )
         profile = await cur.fetchone()
 
     if not profile:
-        await call.message.edit_text(
+        await edit_current_message(
+            call,
             "Анкета не найдена 🤍",
-            reply_markup=start_kb()
+            start_kb()
         )
         return
 
+    uid, name, age, city, role, goal, about, photo_id = profile
     text = (
-        f"{profile[4]} {profile[1]}, {profile[2]} · 📍 {profile[3]}\n"
-        f"🔍: {profile[5]}\n\n"
-        f"{profile[6] or ''}"
+        f"{role} {name}, {age} · 📍 {city}\n"
+        f"🔍: {goal}\n\n"
+        f"{about or ''}"
     )
 
-    if call.message.photo:
-        await call.message.edit_caption(
-            caption=text,
-            reply_markup=profile_main_kb()
-        )
-    else:
-        await call.message.edit_text(
-            text,
-            reply_markup=profile_main_kb()
-        )
-
+    await edit_current_message(
+        call,
+        text,
+        edit_menu_kb()
+    )
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_photo)
