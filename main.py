@@ -600,22 +600,34 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
     if not to_user:
         return
 
-    # ❌ дизлайк — просто следующая анкета
+    # ❌ дизлайк
     if call.data == "dislike":
         await show_next_profile(call, state)
         return
 
-    # ❤️ пользователь лайкнул
     async with aiosqlite.connect(DB) as db:
+        # сохраняем лайк
         await db.execute(
             "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
         )
+
+        # 🔍 проверяем взаимность
+        cur = await db.execute(
+            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
+            (to_user, from_user)
+        )
+        is_match = await cur.fetchone()
+
         await db.commit()
 
-    # 💛 мягкое уведомление лайкнутому
-    await notify_soft_like(from_user, to_user)
+    if is_match:
+        # 💞 ВЗАИМНО — ничего больше не показываем
+        await notify_match(from_user, to_user)
+        return
 
+    # 💛 не взаимно
+    await notify_soft_like(from_user, to_user)
     await show_next_profile(call, state)
 
 
