@@ -240,8 +240,8 @@ async def open_edit_menu(call: CallbackQuery, state: FSMContext):
             "Что вы хотите изменить?",
             reply_markup=edit_menu_kb()
         )
-@dp.callback_query(F.data == "cancel_delete")
-async def cancel_delete(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
@@ -271,7 +271,7 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
     await edit_current_message(
         call,
         text,
-        edit_menu_kb()
+        profile_main_kb()
     )
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
