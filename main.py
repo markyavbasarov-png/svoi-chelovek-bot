@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 import aiosqlite
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
@@ -436,10 +438,15 @@ async def cancel_delete(call: CallbackQuery, state: FSMContext):
 # ================= PROFILE FLOW =================
 @dp.callback_query(F.data == "start_form")
 async def start_form(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await state.clear()
     await state.set_state(Profile.name)
-    await call.message.edit_text("Как тебя зовут?")
 
+    if call.message.photo:
+        await call.message.edit_caption("Как тебя зовут?")
+    else:
+        await call.message.edit_text("Как тебя зовут?")
+        
 @dp.message(Profile.name)
 async def set_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
