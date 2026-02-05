@@ -251,12 +251,18 @@ async def open_edit_menu(call: CallbackQuery, state: FSMContext):
         )
 
 
-@dp.callback_query(F.data == "back_to_profile")
-async def back_to_profile(call: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data.startswith("goal_edit_"), Profile.edit_goal)
+async def edit_goal_save(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    await state.clear()
+    goal = call.data.replace("goal_edit_", "")
 
     async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET goal = ? WHERE user_id = ?",
+            (goal, call.from_user.id)
+        )
+        await db.commit()
+
         cur = await db.execute(
             "SELECT user_id, name, age, city, role, goal, about, photo_id "
             "FROM users WHERE user_id = ?",
@@ -264,13 +270,7 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
         )
         profile = await cur.fetchone()
 
-    if not profile:
-        await edit_current_message(
-            call,
-            "Анкета не найдена 🤍",
-            start_kb()
-        )
-        return
+    await state.clear()
 
     uid, name, age, city, role, goal, about, photo_id = profile
     text = (
@@ -284,7 +284,6 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
         text,
         profile_main_kb()
     )
-
 
 
 @dp.callback_query(F.data == "edit_photo")
