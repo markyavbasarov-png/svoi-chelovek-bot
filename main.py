@@ -582,6 +582,8 @@ async def show_next_profile(call: CallbackQuery, state: FSMContext):
         browse_kb()
     )
 # ================= LIKES + MATCH =================
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+
 @dp.callback_query(F.data.in_(["like", "dislike"]))
 async def like_dislike(call: CallbackQuery, state: FSMContext):
     await call.answer("❤️" if call.data == "like" else "✖️")
@@ -593,38 +595,32 @@ async def like_dislike(call: CallbackQuery, state: FSMContext):
     if not to_user:
         return
 
-    # ❌ дизлайк — просто следующая анкета
     if call.data == "dislike":
         await show_next_profile(call, state)
         return
 
-    # ❤️ пользователь лайкнул
     async with aiosqlite.connect(DB) as db:
-        # сохраняем лайк
         await db.execute(
             "INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)",
             (from_user, to_user)
         )
 
-        # 🔍 проверяем — был ли лайк в ответ
         cur = await db.execute(
             "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
             (to_user, from_user)
         )
         is_match = await cur.fetchone()
-
         await db.commit()
 
-    # 💞 если уже был лайк в ответ — это матч
     if is_match:
         await notify_match(from_user, to_user)
         return
 
-    # 💛 если не взаимно — мягкое уведомление
     await notify_soft_like(from_user, to_user)
     await show_next_profile(call, state)
-    
-# 💛 мягкое уведомление
+
+
+# 💛 мягкий лайк
 async def notify_soft_like(from_user: int, to_user: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
@@ -636,29 +632,40 @@ async def notify_soft_like(from_user: int, to_user: int):
     if not profile:
         return
 
-    await bot.send_message(
-        to_user,
-        "💛 Кому-то вы понравились\n"
-        "Возможно, это начало чего-то тёплого"
-    )
+    try:
+        await bot.send_message(
+            to_user,
+            "💛 Кому-то вы понравились\n"
+            "Возможно, это начало чего-то тёплого"
+        )
 
-    await asyncio.sleep(0.3)
+        await asyncio.sleep(0.3)
 
-    await send_profile_card(
-        to_user,
-        profile,
-        soft_like_kb(from_user)  # 👈 передаём ID лайкнувшего
-    )
+        await send_profile_card(
+            to_user,
+            profile,
+            soft_like_kb(from_user)
+        )
+
+    except TelegramForbiddenError:
+        logging.warning(f"User {to_user} blocked the bot")
+    except Exception as e:
+        logging.error(f"notify_soft_like error: {e}")
+
 
 @dp.callback_query(F.data.startswith("soft_like:"))
 async def confirm_soft_like(call: CallbackQuery):
     await call.answer()
 
-    # 🔒 убираем кнопки
-    await call.message.edit_reply_markup(reply_markup=None)
-
     from_user = call.from_user.id
     to_user = int(call.data.split(":")[1])
+
+    # безопасно убираем кнопки
+    try:
+        if call.message:
+            await call.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass
 
     async with aiosqlite.connect(DB) as db:
         await db.execute(
@@ -667,47 +674,58 @@ async def confirm_soft_like(call: CallbackQuery):
         )
         await db.commit()
 
-    # 💞 теперь это MATCH
     await notify_match(from_user, to_user)
 
-    await call.message.edit_text(
-        "🤍 Это взаимно!\n"
-        "Теперь можно написать друг другу 🌿"
-    )
+    try:
+        await call.message.edit_text(
+            "🤍 Это взаимно!\n"
+            "Теперь можно написать друг другу 🌿"
+        )
+    except TelegramBadRequest:
+        pass
 
 
 @dp.callback_query(F.data == "soft_dislike")
 async def soft_dislike(call: CallbackQuery):
     await call.answer()
-    await call.message.edit_text("🤍 Хорошо, идём дальше")
+    try:
+        await call.message.edit_text("🤍 Хорошо, идём дальше")
+    except TelegramBadRequest:
+        pass
 
 
-# 💞 матч-уведомление
+# 💞 матч
 async def notify_match(u1: int, u2: int):
     for viewer, partner in [(u1, u2), (u2, u1)]:
-        async with aiosqlite.connect(DB) as db:
-            cur = await db.execute("""
-                SELECT user_id, name, age, city, role, goal, about, photo_id
-                FROM users WHERE user_id = ?
-            """, (partner,))
-            profile = await cur.fetchone()
+        try:
+            async with aiosqlite.connect(DB) as db:
+                cur = await db.execute("""
+                    SELECT user_id, name, age, city, role, goal, about, photo_id
+                    FROM users WHERE user_id = ?
+                """, (partner,))
+                profile = await cur.fetchone()
 
-        if not profile:
-            continue
+            if not profile:
+                continue
 
-        await bot.send_message(
-            viewer,
-            "🤍 У вас взаимная симпатия\n"
-            "Можно написать друг другу 🌿"
-        )
+            await bot.send_message(
+                viewer,
+                "🤍 У вас взаимная симпатия\n"
+                "Можно написать друг другу 🌿"
+            )
 
-        await asyncio.sleep(0.3)
+            await asyncio.sleep(0.3)
 
-        await send_profile_card(
-            viewer,
-            profile,
-            match_kb(partner)
-        )
+            await send_profile_card(
+                viewer,
+                profile,
+                match_kb(partner)
+            )
+
+        except TelegramForbiddenError:
+            logging.warning(f"User {viewer} blocked the bot")
+        except Exception as e:
+            logging.error(f"notify_match error: {e}")
 # ================= RUN =================
 async def set_commands(bot: Bot):
     commands = [
