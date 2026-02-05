@@ -442,11 +442,9 @@ async def start_form(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.set_state(Profile.name)
 
-    if call.message.photo:
-        await call.message.edit_caption("Как тебя зовут?")
-    else:
-        await call.message.edit_text("Как тебя зовут?")
-        
+    # ❌ НЕ редактируем старое сообщение
+    # ✅ отправляем новое
+    await call.message.answer("Как тебя зовут?")
 @dp.message(Profile.name)
 async def set_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
