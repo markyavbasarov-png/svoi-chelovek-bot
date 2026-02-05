@@ -77,13 +77,19 @@ def role_kb():
 def goal_create_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_create_Прогулки")],
-        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_create_Общение")]
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_create_Общение")],
+        [InlineKeyboardButton(text="🫂 Поддержка", callback_data="goal_create_Поддержка")],
+        [InlineKeyboardButton(text="☕️ Кофе / встречи", callback_data="goal_create_Кофе")],
+        [InlineKeyboardButton(text="👶 Общение с детьми", callback_data="goal_create_Дети")]
     ])
 
 def goal_edit_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_edit_Прогулки")],
-        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_edit_Общение")]
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_edit_Общение")],
+        [InlineKeyboardButton(text="🫂 Поддержка", callback_data="goal_edit_Поддержка")],
+        [InlineKeyboardButton(text="☕️ Кофе / встречи", callback_data="goal_edit_Кофе")],
+        [InlineKeyboardButton(text="👶 Общение с детьми", callback_data="goal_edit_Дети")]
     ])
 def skip_about_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -339,7 +345,7 @@ async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
     await edit_current_message(
         call,
-        "🎯 Что вам сейчас ближе?",
+        "🎯 Что вам сейчас особенно важно ?",
         goal_edit_kb()   # ✅ ВАЖНО
     )
 
@@ -474,7 +480,7 @@ async def set_role(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.goal)
 
     await call.message.edit_text(
-        "🎯 Что вам сейчас ближе?",
+        "🎯 Что вам сейчас особенно важно?",
         reply_markup=goal_create_kb()
     )
 
