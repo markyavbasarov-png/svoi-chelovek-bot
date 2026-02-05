@@ -400,16 +400,6 @@ async def confirm_delete(call: CallbackQuery, state: FSMContext):
             "🗑 Анкета удалена\n\nХочешь создать новую?",
             reply_markup=start_kb()
         )
-@dp.callback_query(F.data == "create_new_profile")
-async def create_new_profile(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await state.clear()
-
-    await call.message.edit_text(
-        "💫 Давай создадим новую анкету!\n\nКак тебя зовут?"
-    )
-
-    await state.set_state(StatesGroup.name)
     
 @dp.callback_query(F.data == "cancel_delete")
 async def cancel_delete(call: CallbackQuery, state: FSMContext):
