@@ -361,6 +361,21 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
 
         await state.clear()
         await send_my_profile(call.from_user.id)
+
+@dp.callback_query(F.data == "back_to_profile")
+async def back_to_profile(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await state.clear()
+
+    profile = await get_profile(call.from_user.id)
+
+    text = render_profile_text(profile)
+
+    await edit_current_message(
+        call,
+        text,
+        profile_main_kb()
+    )
     
 # ================= DELETE PROFILE =================
 @dp.callback_query(F.data == "delete_profile")
