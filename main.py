@@ -356,6 +356,22 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
         await send_my_profile(call.from_user.id)
     
 # ================= DELETE PROFILE =================
+@dp.callback_query(F.data == "delete_profile")
+async def delete_profile(call: CallbackQuery):
+    await call.answer()
+
+    if call.message.photo:
+        await call.message.edit_caption(
+            caption="🗑 Вы уверены, что хотите удалить анкету?\n\nЭто действие нельзя отменить.",
+            reply_markup=confirm_delete_kb()
+        )
+    else:
+        await call.message.edit_text(
+            "🗑 Вы уверены, что хотите удалить анкету?\n\nЭто действие нельзя отменить.",
+            reply_markup=confirm_delete_kb()
+        )
+
+
 @dp.callback_query(F.data == "confirm_delete")
 async def confirm_delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
