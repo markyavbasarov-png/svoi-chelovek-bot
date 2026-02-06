@@ -77,19 +77,13 @@ def role_kb():
 def goal_create_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_create_Прогулки")],
-        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_create_Общение")],
-        [InlineKeyboardButton(text="🫂 Поддержка", callback_data="goal_create_Поддержка")],
-        [InlineKeyboardButton(text="☕️ Кофе / встречи", callback_data="goal_create_Кофе")],
-        [InlineKeyboardButton(text="👶 Общение с детьми", callback_data="goal_create_Дети")]
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_create_Общение")]
     ])
 
 def goal_edit_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚶 Прогулки", callback_data="goal_edit_Прогулки")],
-        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_edit_Общение")],
-        [InlineKeyboardButton(text="🫂 Поддержка", callback_data="goal_edit_Поддержка")],
-        [InlineKeyboardButton(text="☕️ Кофе / встречи", callback_data="goal_edit_Кофе")],
-        [InlineKeyboardButton(text="👶 Общение с детьми", callback_data="goal_edit_Дети")]
+        [InlineKeyboardButton(text="💬 Общение", callback_data="goal_edit_Общение")]
     ])
 def skip_about_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -284,6 +278,9 @@ async def back_to_profile(call: CallbackQuery, state: FSMContext):
         text,
         profile_main_kb()
     )
+
+
+
 @dp.callback_query(F.data == "edit_photo")
 async def edit_photo(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_photo)
@@ -337,25 +334,12 @@ async def save_edit_about(message: Message, state: FSMContext):
     await message.answer("✏️ О себе обновлено")
     await send_my_profile(message.from_user.id)
 
-@dp.message(Profile.edit_about)
-async def save_edit_about(message: Message, state: FSMContext):
-    async with aiosqlite.connect(DB) as db:
-        await db.execute(
-            "UPDATE users SET about = ? WHERE user_id = ?",
-            (message.text, message.from_user.id)
-        )
-        await db.commit()
-
-    await state.clear()
-    await message.answer("✏️ О себе обновлено")
-    await send_my_profile(message.from_user.id)
-
 @dp.callback_query(F.data == "edit_goal")
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
     await edit_current_message(
         call,
-        "🎯 Что вам сейчас особенно важно ?",
+        "🎯 Что вам сейчас ближе?",
         goal_edit_kb()   # ✅ ВАЖНО
     )
 
@@ -372,8 +356,7 @@ async def edit_goal_save(call: CallbackQuery, state: FSMContext):
 
         await state.clear()
         await send_my_profile(call.from_user.id)
-
-
+    
 # ================= DELETE PROFILE =================
 @dp.callback_query(F.data == "delete_profile")
 async def delete_profile(call: CallbackQuery):
@@ -491,7 +474,7 @@ async def set_role(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.goal)
 
     await call.message.edit_text(
-        "🎯 Что вам сейчас особенно важно?",
+        "🎯 Что вам сейчас ближе?",
         reply_markup=goal_create_kb()
     )
 
@@ -524,10 +507,9 @@ async def set_about(message: Message, state: FSMContext):
     await message.answer("Добавить фото?", reply_markup=photo_kb())
 
 @dp.callback_query(F.data == "upload_photo", Profile.photo)
-async def upload_photo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Profile.photo)   # ✅ ВОТ ЭТОГО НЕ ХВАТАЛО
+async def upload_photo(call: CallbackQuery):
     await call.message.edit_text("Отправь фотографию 🤍")
-    
+
 @dp.callback_query(F.data == "skip_photo", Profile.photo)
 async def skip_photo(call: CallbackQuery, state: FSMContext):
     await save_profile(call.from_user, state, None)
@@ -535,39 +517,8 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
-    # сохраняем фото и очищаем состояние
     await save_profile(message.from_user, state, message.photo[-1].file_id)
-    
-    # формируем текст анкеты
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
-        """, (message.from_user.id,))
-        profile = await cur.fetchone()
-
-    if not profile:
-        await message.answer("Анкета не найдена 🤍")
-        return
-
-    uid, name, age, city, role, goal, about, photo_id = profile
-    text = (
-        f"{role} {name}, {age} · 📍 {city}\n"
-        f"🔍: {goal}\n\n"
-        f"{about or ''}"
-    )
-
-    if photo_id:
-        await message.answer_photo(
-            photo=photo_id,
-            caption=text,
-            reply_markup=profile_main_kb()
-        )
-    else:
-        await message.answer(
-            text=text,
-            reply_markup=profile_main_kb()
-        )
+    await send_my_profile(message.from_user.id)
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
@@ -592,55 +543,27 @@ async def save_profile(user, state, photo_id):
 # ================= PROFILE RENDER =================
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
-
     text = (
         f"{role} {name}, {age} · 📍 {city}\n"
         f"🔍: {goal}\n\n"
         f"{about or ''}"
     )
-
     if photo_id:
-        await bot.send_photo(
-            chat_id,
-            photo_id,
-            caption=text,
-            reply_markup=kb
-        )
+        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
     else:
-        await bot.send_message(
-            chat_id,
-            text,
-            reply_markup=kb
-        )
+        await bot.send_message(chat_id, text, reply_markup=kb)
 
 async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
+        SELECT user_id, name, age, city, role, goal, about, photo_id
+        FROM users WHERE user_id = ?
         """, (user_id,))
         profile = await cur.fetchone()
 
-    if not profile:
-        await bot.send_message(user_id, "Анкета не найдена 🤍")
-        return
+    if profile:
+        await send_profile_card(user_id, profile, profile_main_kb())
 
-    await send_profile_card(user_id, profile, profile_main_kb())
-        return
-
-    uid, name, age, city, role, goal, about, photo_id = profile
-
-    text = (
-        f"{role} {name}, {age} · 📍 {city}\n"
-        f"🔍: {goal}\n\n"
-        f"{about or ''}"
-    )
-
-    await edit_current_message(
-        call,
-        text,
-        profile_main_kb()
-    )
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
