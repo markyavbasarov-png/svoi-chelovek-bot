@@ -546,7 +546,6 @@ async def save_profile(user, state, photo_id):
     await state.clear()
 
 # ================= PROFILE RENDER =================
-
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
 
@@ -570,17 +569,20 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
             reply_markup=kb
         )
 
-
 async def render_my_profile(call: CallbackQuery):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
-        SELECT user_id, name, age, city, role, goal, about, photo_id
-        FROM users WHERE user_id = ?
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users WHERE user_id = ?
         """, (call.from_user.id,))
         profile = await cur.fetchone()
 
     if not profile:
-        await edit_current_message(call, "Анкета не найдена 🤍", start_kb())
+        await edit_current_message(
+            call,
+            "Анкета не найдена 🤍",
+            start_kb()
+        )
         return
 
     uid, name, age, city, role, goal, about, photo_id = profile
@@ -591,8 +593,11 @@ async def render_my_profile(call: CallbackQuery):
         f"{about or ''}"
     )
 
-    await edit_current_message(call, text, profile_main_kb())
-
+    await edit_current_message(
+        call,
+        text,
+        profile_main_kb()
+    )
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
 async def browse(call: CallbackQuery, state: FSMContext):
