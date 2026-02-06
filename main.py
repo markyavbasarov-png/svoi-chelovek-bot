@@ -522,8 +522,39 @@ async def skip_photo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Profile.photo, F.photo)
 async def set_photo(message: Message, state: FSMContext):
+    # сохраняем фото и очищаем состояние
     await save_profile(message.from_user, state, message.photo[-1].file_id)
-    await send_my_profile(message.from_user.id)
+    
+    # формируем текст анкеты
+    async with aiosqlite.connect(DB) as db:
+        cur = await db.execute("""
+            SELECT user_id, name, age, city, role, goal, about, photo_id
+            FROM users WHERE user_id = ?
+        """, (message.from_user.id,))
+        profile = await cur.fetchone()
+
+    if not profile:
+        await message.answer("Анкета не найдена 🤍")
+        return
+
+    uid, name, age, city, role, goal, about, photo_id = profile
+    text = (
+        f"{role} {name}, {age} · 📍 {city}\n"
+        f"🔍: {goal}\n\n"
+        f"{about or ''}"
+    )
+
+    if photo_id:
+        await message.answer_photo(
+            photo=photo_id,
+            caption=text,
+            reply_markup=profile_main_kb()
+        )
+    else:
+        await message.answer(
+            text=text,
+            reply_markup=profile_main_kb()
+        )
 
 # ================= SAVE =================
 async def save_profile(user, state, photo_id):
