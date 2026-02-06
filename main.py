@@ -545,6 +545,7 @@ async def save_profile(user, state, photo_id):
     await state.clear()
 
 # ================= PROFILE RENDER =================
+
 async def send_profile_card(chat_id: int, profile: tuple, kb):
     uid, name, age, city, role, goal, about, photo_id = profile
 
@@ -568,37 +569,28 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
             reply_markup=kb
         )
 
-async def send_my_profile(user_id: int):
-    async with aiosqlite.connect(DB) as db:
-        cur = await db.execute(
-            """
-            SELECT user_id, name, age, city, role, goal, about, photo_id
-            FROM users WHERE user_id = ?
-            """,
-            (user_id,)
-        )
-        profile = await cur.fetchone()
 
-    if profile:
-        await send_profile_card(
-            user_id,
-            profile,
-            profile_main_kb()
-        )
-    if photo_id:
-        await bot.send_photo(chat_id, photo_id, caption=text, reply_markup=kb)
-    else:
-        await bot.send_message(chat_id, text, reply_markup=kb)
-async def send_my_profile(user_id: int):
+async def render_my_profile(call: CallbackQuery):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
         SELECT user_id, name, age, city, role, goal, about, photo_id
         FROM users WHERE user_id = ?
-        """, (user_id,))
+        """, (call.from_user.id,))
         profile = await cur.fetchone()
 
-    if profile:
-        await send_profile_card(user_id, profile, profile_main_kb())
+    if not profile:
+        await edit_current_message(call, "Анкета не найдена 🤍", start_kb())
+        return
+
+    uid, name, age, city, role, goal, about, photo_id = profile
+
+    text = (
+        f"{role} {name}, {age} · 📍 {city}\n"
+        f"🔍: {goal}\n\n"
+        f"{about or ''}"
+    )
+
+    await edit_current_message(call, text, profile_main_kb())
 
 # ================= BROWSE =================
 @dp.callback_query(F.data == "browse")
