@@ -337,6 +337,19 @@ async def save_edit_about(message: Message, state: FSMContext):
     await message.answer("✏️ О себе обновлено")
     await send_my_profile(message.from_user.id)
 
+@dp.message(Profile.edit_about)
+async def save_edit_about(message: Message, state: FSMContext):
+    async with aiosqlite.connect(DB) as db:
+        await db.execute(
+            "UPDATE users SET about = ? WHERE user_id = ?",
+            (message.text, message.from_user.id)
+        )
+        await db.commit()
+
+    await state.clear()
+    await message.answer("✏️ О себе обновлено")
+    await send_my_profile(message.from_user.id)
+
 @dp.callback_query(F.data == "edit_goal")
 async def edit_goal(call: CallbackQuery, state: FSMContext):
     await state.set_state(Profile.edit_goal)
@@ -600,20 +613,19 @@ async def send_profile_card(chat_id: int, profile: tuple, kb):
             reply_markup=kb
         )
 
-async def render_my_profile(call: CallbackQuery):
+async def send_my_profile(user_id: int):
     async with aiosqlite.connect(DB) as db:
         cur = await db.execute("""
             SELECT user_id, name, age, city, role, goal, about, photo_id
             FROM users WHERE user_id = ?
-        """, (call.from_user.id,))
+        """, (user_id,))
         profile = await cur.fetchone()
 
     if not profile:
-        await edit_current_message(
-            call,
-            "Анкета не найдена 🤍",
-            start_kb()
-        )
+        await bot.send_message(user_id, "Анкета не найдена 🤍")
+        return
+
+    await send_profile_card(user_id, profile, profile_main_kb())
         return
 
     uid, name, age, city, role, goal, about, photo_id = profile
